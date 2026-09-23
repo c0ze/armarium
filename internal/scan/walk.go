@@ -38,7 +38,7 @@ func (s *Scanner) walk(ctx context.Context, realRoot string, include []string, v
 			return nil
 		}
 		if d.IsDir() {
-			if rel != "." && strings.HasPrefix(d.Name(), ".") {
+			if rel != "." && (strings.HasPrefix(d.Name(), ".") || nasDirs[d.Name()]) {
 				return fs.SkipDir
 			}
 			if s.DirSleep > 0 {
@@ -59,6 +59,10 @@ func (s *Scanner) walk(ctx context.Context, realRoot string, include []string, v
 	})
 	return unreadable, err
 }
+
+// nasDirs are thumbnail, recycle-bin and snapshot folders that NAS systems add
+// inside shared folders (Synology, QNAP). Walking them costs I/O for nothing.
+var nasDirs = map[string]bool{"@eaDir": true, "#recycle": true, "#snapshot": true, "@Recycle": true, ".@__thumb": true}
 
 // under reports whether rel is one of dirs or inside one of them.
 func under(dirs []string, rel string) bool {

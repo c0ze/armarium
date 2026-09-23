@@ -217,3 +217,15 @@ func TestProgressWriteDuringScanIsNotBlocked(t *testing.T) {
 		t.Fatal(w.err)
 	}
 }
+
+func TestNASSystemFoldersAreSkipped(t *testing.T) {
+	root := t.TempDir()
+	tu.WriteZip(t, root, "Conan/Conan 01.cbz", page())
+	tu.WriteZip(t, root, "Conan/@eaDir/Conan 01.cbz", page())
+	tu.WriteZip(t, root, "#recycle/Old 01.cbz", page())
+	sc, st := newScanner(t, config.Library{Name: "C", Root: root, Kind: "comics"})
+	sc.Run(context.Background(), "")
+	if _, total, _ := st.Items(context.Background(), store.ItemFilter{Limit: 10}); total != 1 {
+		t.Fatalf("NAS system folders were scanned: %d items", total)
+	}
+}
