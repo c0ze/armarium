@@ -160,3 +160,20 @@ type fakeContainer struct{ closed bool }
 func (f *fakeContainer) Pages() int                              { return 0 }
 func (f *fakeContainer) Page(int) (io.ReadCloser, string, error) { return nil, "", ErrNoPage }
 func (f *fakeContainer) Close() error                            { f.closed = true; return nil }
+
+// Comics are often saved with the wrong extension; the signature decides.
+func TestMisnamedArchivesOpenByContent(t *testing.T) {
+	dir := t.TempDir()
+	zipAsCBR := tu.WriteZip(t, dir, "really-zip.cbr", comicEntries()...)
+	rarAsCBZ := tu.WriteRAR(t, dir, "really-rar.cbz", comicEntries()...)
+	for p, format := range map[string]string{zipAsCBR: "cbr", rarAsCBZ: "cbz"} {
+		c, err := Open(p, format, lim)
+		if err != nil {
+			t.Fatalf("%s: %v", filepath.Base(p), err)
+		}
+		if c.Pages() != 3 {
+			t.Fatalf("%s: pages %d", filepath.Base(p), c.Pages())
+		}
+		c.Close()
+	}
+}

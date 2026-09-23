@@ -159,7 +159,10 @@ func (s *Scanner) library(ctx context.Context, lib store.Library) error {
 	visit := func(f found) {
 		seen[f.rel] = true
 		k, ok := known[f.rel]
-		if ok && k.Size == f.size && k.MTime == f.mt {
+		// A readable file stuck at 0 pages failed to open last time; retry it so
+		// reader fixes (misnamed archives, odd EPUBs) reach existing entries.
+		retry := k.Pages == 0 && retryable(f.rel)
+		if ok && k.Size == f.size && k.MTime == f.mt && !retry {
 			if f.meta != nil { // Calibre metadata can change while the file does not
 				it := *f.meta
 				it.Pages = k.Pages

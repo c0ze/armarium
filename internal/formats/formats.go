@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path"
 	"strings"
 )
@@ -31,15 +32,41 @@ type Container interface {
 	Close() error
 }
 
-// Open opens a comic container for format "cbz" or "cbr".
+// Open opens a comic container for format "cbz" or "cbr". The archive type is
+// taken from the file's first bytes when they are recognisable: comics named
+// .cbr that are really ZIP files (and the reverse) are common.
 func Open(p, format string, lim Limits) (Container, error) {
-	switch format {
-	case "cbz":
+	if format != "cbz" && format != "cbr" {
+		return nil, fmt.Errorf("%w: %s", ErrNotArchive, format)
+	}
+	switch sniff(p) {
+	case "zip":
 		return openZip(p, lim)
-	case "cbr":
+	case "rar":
 		return openRar(p, lim)
 	}
-	return nil, fmt.Errorf("%w: %s", ErrNotArchive, format)
+	if format == "cbz" {
+		return openZip(p, lim)
+	}
+	return openRar(p, lim)
+}
+
+// sniff reads an archive's signature: "zip", "rar" or "" when unknown.
+func sniff(p string) string {
+	f, err := os.Open(p)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+	b := make([]byte, 7)
+	n, _ := io.ReadFull(f, b)
+	switch {
+	case n >= 4 && string(b[:4]) == "PK\x03\x04":
+		return "zip"
+	case n >= 7 && string(b[:6]) == "Rar!\x1a\x07":
+		return "rar"
+	}
+	return ""
 }
 
 // mediaTypes lists every format Armarium lists. CBZ, CBR, EPUB and PDF are read in

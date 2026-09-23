@@ -229,3 +229,27 @@ func TestNASSystemFoldersAreSkipped(t *testing.T) {
 		t.Fatalf("NAS system folders were scanned: %d items", total)
 	}
 }
+
+func TestItemsThatFailedToOpenAreRetried(t *testing.T) {
+	root := t.TempDir()
+	p := filepath.Join(root, "S", "broken.cbz")
+	os.MkdirAll(filepath.Dir(p), 0o755)
+	os.WriteFile(p, []byte("not yet an archive"), 0o644)
+	mt := time.Now().Add(-time.Hour)
+	os.Chtimes(p, mt, mt)
+	sc, st := newScanner(t, config.Library{Name: "C", Root: root, Kind: "comics"})
+	ctx := context.Background()
+	sc.Run(ctx, "")
+	// Same size and mtime, but now readable (as when a reader bug is fixed).
+	fixed := tu.WriteZip(t, t.TempDir(), "x.cbz", page())
+	b, _ := os.ReadFile(fixed)
+	os.WriteFile(p, b, 0o644)
+	os.Chtimes(p, mt, mt)
+	known, _ := st.KnownItems(ctx, 1)
+	st.DB.Exec("UPDATE item SET size = ? WHERE id = ?", len(b), known["S/broken.cbz"].ID)
+	sc.Run(ctx, "")
+	items, _, _ := st.Items(ctx, store.ItemFilter{Limit: 1})
+	if items[0].Pages != 1 {
+		t.Fatalf("0-page item not retried: %+v", items[0])
+	}
+}

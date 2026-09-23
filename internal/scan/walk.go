@@ -97,3 +97,12 @@ func insideRoot(realRoot, p string) bool {
 	rel, err := filepath.Rel(realRoot, target)
 	return err == nil && rel != ".." && !strings.HasPrefix(rel, "../")
 }
+
+// retryable reports whether a file's format can yield pages when reopened.
+func retryable(rel string) bool {
+	switch formats.FormatOf(rel) {
+	case "cbz", "cbr", "epub":
+		return true
+	}
+	return false
+}
