@@ -2,3 +2,7 @@
 /data/
 armarium.toml
 .claude/launch.json
+.impeccable/review/
+.impeccable/refs/
+.impeccable/questions/
+.impeccable/build/

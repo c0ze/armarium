@@ -1,0 +1,446 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-24T07:45:00+09:00",
+  "title": "Design System: Armarium",
+  "extensions": {
+    "colorMeta": {
+      "amber": {
+        "role": "primary",
+        "displayName": "Reading Amber",
+        "tonalRamp": [
+          "oklch(15% 0.14 85)",
+          "oklch(25% 0.14 85)",
+          "oklch(35% 0.14 85)",
+          "oklch(48% 0.14 85)",
+          "oklch(60% 0.14 85)",
+          "oklch(72% 0.14 85)",
+          "oklch(84% 0.14 85)",
+          "oklch(95% 0.14 85)"
+        ]
+      },
+      "amber-ink": {
+        "role": "primary",
+        "displayName": "Amber Ink",
+        "tonalRamp": [
+          "oklch(15% 0.04 85)",
+          "oklch(25% 0.04 85)",
+          "oklch(35% 0.04 85)",
+          "oklch(48% 0.04 85)",
+          "oklch(60% 0.04 85)",
+          "oklch(72% 0.04 85)",
+          "oklch(84% 0.04 85)",
+          "oklch(95% 0.04 85)"
+        ]
+      },
+      "ground": {
+        "role": "neutral",
+        "displayName": "Night Ground",
+        "tonalRamp": [
+          "oklch(15% 0.012 260)",
+          "oklch(25% 0.012 260)",
+          "oklch(35% 0.012 260)",
+          "oklch(48% 0.012 260)",
+          "oklch(60% 0.012 260)",
+          "oklch(72% 0.012 260)",
+          "oklch(84% 0.012 260)",
+          "oklch(95% 0.012 260)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Shelf Surface",
+        "tonalRamp": [
+          "oklch(15% 0.018 262)",
+          "oklch(25% 0.018 262)",
+          "oklch(35% 0.018 262)",
+          "oklch(48% 0.018 262)",
+          "oklch(60% 0.018 262)",
+          "oklch(72% 0.018 262)",
+          "oklch(84% 0.018 262)",
+          "oklch(95% 0.018 262)"
+        ]
+      },
+      "raised": {
+        "role": "neutral",
+        "displayName": "Raised Slate",
+        "tonalRamp": [
+          "oklch(15% 0.022 264)",
+          "oklch(25% 0.022 264)",
+          "oklch(35% 0.022 264)",
+          "oklch(48% 0.022 264)",
+          "oklch(60% 0.022 264)",
+          "oklch(72% 0.022 264)",
+          "oklch(84% 0.022 264)",
+          "oklch(95% 0.022 264)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "tonalRamp": [
+          "oklch(15% 0.022 264)",
+          "oklch(25% 0.022 264)",
+          "oklch(35% 0.022 264)",
+          "oklch(48% 0.022 264)",
+          "oklch(60% 0.022 264)",
+          "oklch(72% 0.022 264)",
+          "oklch(84% 0.022 264)",
+          "oklch(95% 0.022 264)"
+        ]
+      },
+      "outline": {
+        "role": "neutral",
+        "displayName": "Outline Grey",
+        "tonalRamp": [
+          "oklch(15% 0.025 264)",
+          "oklch(25% 0.025 264)",
+          "oklch(35% 0.025 264)",
+          "oklch(48% 0.025 264)",
+          "oklch(60% 0.025 264)",
+          "oklch(72% 0.025 264)",
+          "oklch(84% 0.025 264)",
+          "oklch(95% 0.025 264)"
+        ]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Bone",
+        "tonalRamp": [
+          "oklch(15% 0.004 285)",
+          "oklch(25% 0.004 285)",
+          "oklch(35% 0.004 285)",
+          "oklch(48% 0.004 285)",
+          "oklch(60% 0.004 285)",
+          "oklch(72% 0.004 285)",
+          "oklch(84% 0.004 285)",
+          "oklch(95% 0.004 285)"
+        ]
+      },
+      "text-2": {
+        "role": "neutral",
+        "displayName": "Ash",
+        "tonalRamp": [
+          "oklch(15% 0.015 260)",
+          "oklch(25% 0.015 260)",
+          "oklch(35% 0.015 260)",
+          "oklch(48% 0.015 260)",
+          "oklch(60% 0.015 260)",
+          "oklch(72% 0.015 260)",
+          "oklch(84% 0.015 260)",
+          "oklch(95% 0.015 260)"
+        ]
+      },
+      "text-3": {
+        "role": "neutral",
+        "displayName": "Smoke",
+        "tonalRamp": [
+          "oklch(15% 0.018 260)",
+          "oklch(25% 0.018 260)",
+          "oklch(35% 0.018 260)",
+          "oklch(48% 0.018 260)",
+          "oklch(60% 0.018 260)",
+          "oklch(72% 0.018 260)",
+          "oklch(84% 0.018 260)",
+          "oklch(95% 0.018 260)"
+        ]
+      },
+      "danger": {
+        "role": "neutral",
+        "displayName": "Ember Red",
+        "tonalRamp": [
+          "oklch(15% 0.16 30)",
+          "oklch(25% 0.16 30)",
+          "oklch(35% 0.16 30)",
+          "oklch(48% 0.16 30)",
+          "oklch(60% 0.16 30)",
+          "oklch(72% 0.16 30)",
+          "oklch(84% 0.16 30)",
+          "oklch(95% 0.16 30)"
+        ]
+      },
+      "reader-paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "tonalRamp": [
+          "oklch(15% 0.012 90)",
+          "oklch(25% 0.012 90)",
+          "oklch(35% 0.012 90)",
+          "oklch(48% 0.012 90)",
+          "oklch(60% 0.012 90)",
+          "oklch(72% 0.012 90)",
+          "oklch(84% 0.012 90)",
+          "oklch(95% 0.012 90)"
+        ]
+      },
+      "reader-ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "tonalRamp": [
+          "oklch(15% 0.006 80)",
+          "oklch(25% 0.006 80)",
+          "oklch(35% 0.006 80)",
+          "oklch(48% 0.006 80)",
+          "oklch(60% 0.006 80)",
+          "oklch(72% 0.006 80)",
+          "oklch(84% 0.006 80)",
+          "oklch(95% 0.006 80)"
+        ]
+      },
+      "reader-link-paper": {
+        "role": "neutral",
+        "displayName": "Paper Link",
+        "tonalRamp": [
+          "oklch(15% 0.1 65)",
+          "oklch(25% 0.1 65)",
+          "oklch(35% 0.1 65)",
+          "oklch(48% 0.1 65)",
+          "oklch(60% 0.1 65)",
+          "oklch(72% 0.1 65)",
+          "oklch(84% 0.1 65)",
+          "oklch(95% 0.1 65)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Wall hero title; login wordmark scales it up."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page titles: library, series, admin, item."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Rail and section headings; open-tile titles; reader bar titles."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "All running copy and data, tabular figures."
+      },
+      "meta": {
+        "displayName": "Meta",
+        "purpose": "Format, page counts, series position in Smoke."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Buttons, selects, sidebar nav, uppercase."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Status and count lines, nav group labels, form labels; follows what it describes."
+      },
+      "reader-body": {
+        "displayName": "Reader Body",
+        "purpose": "EPUB text at a 34em measure; overrides book sizes."
+      }
+    },
+    "shadows": [
+      {
+        "name": "cover-display",
+        "value": "0 24px 60px rgba(0,0,0,.6), 0 2px 6px rgba(0,0,0,.5)",
+        "purpose": "Hero and item-page covers."
+      },
+      {
+        "name": "tile-open",
+        "value": "0 12px 32px rgba(0,0,0,.55)",
+        "purpose": "Widened wall tile."
+      },
+      {
+        "name": "card-lift",
+        "value": "0 14px 30px rgba(0,0,0,.5)",
+        "purpose": "Grid card on hover/focus, with translateY(-3px)."
+      },
+      {
+        "name": "drawer",
+        "value": "12px 0 40px rgba(0,0,0,.45)",
+        "purpose": "Reader contents drawer."
+      },
+      {
+        "name": "focus-ring",
+        "value": "outline: 1px solid #ffc857; outline-offset: 2px",
+        "purpose": "Global :focus-visible; buttons and inputs shift their border to amber instead."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "All state transitions."
+      },
+      {
+        "name": "tile-widen",
+        "value": "flex-basis 0.5s ease; info fade 0.2s after 0.15s delay",
+        "purpose": "Wall tile opening on hover/focus."
+      },
+      {
+        "name": "rail-dim",
+        "value": "opacity 0.4 + saturate(0.5) over 0.4s",
+        "purpose": "Non-hovered rails recede while one is hovered."
+      },
+      {
+        "name": "control",
+        "value": "0.2s",
+        "purpose": "Button border/colour/background changes."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "transition: none; animation: none",
+        "purpose": "Honoured on tiles, cards and the scan pulse."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "rail-to-bottom-bar",
+        "value": "900px"
+      },
+      {
+        "name": "hero-drops-cover",
+        "value": "760px"
+      },
+      {
+        "name": "single-column",
+        "value": "700px"
+      },
+      {
+        "name": "tight-grid",
+        "value": "600px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Neutral Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Default for every action that is not reading.",
+      "html": "<button class=\"ds-btn\">Details</button>",
+      "css": ".ds-btn{font:500 12px/1 system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;display:inline-flex;align-items:center;gap:.6rem;padding:.85rem 1.2rem;border:1px solid #3a4150;border-radius:3px;background:transparent;color:#e6e6e8;cursor:pointer;transition:border-color .2s cubic-bezier(.16,1,.3,1),color .2s cubic-bezier(.16,1,.3,1),background .2s cubic-bezier(.16,1,.3,1)}.ds-btn:hover{border-color:#a4a9b3}.ds-btn:focus-visible{border-color:#ffc857;color:#ffc857;outline:none}"
+    },
+    {
+      "name": "Reading Action Button",
+      "kind": "button",
+      "refersTo": "button-reading",
+      "description": "Resume / Open / Read only; one per screen.",
+      "html": "<button class=\"ds-btn ds-btn-reading\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M8 5v14l11-7z\"/></svg> Resume</button>",
+      "css": ".ds-btn{font:500 12px/1 system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;display:inline-flex;align-items:center;gap:.6rem;padding:.85rem 1.2rem;border:1px solid #3a4150;border-radius:3px;background:transparent;color:#e6e6e8;cursor:pointer;transition:border-color .2s cubic-bezier(.16,1,.3,1),color .2s cubic-bezier(.16,1,.3,1),background .2s cubic-bezier(.16,1,.3,1)}.ds-btn:hover{border-color:#a4a9b3}.ds-btn:focus-visible{border-color:#ffc857;color:#ffc857;outline:none}.ds-btn-reading{border-color:#ffc857;color:#ffc857}.ds-btn-reading:hover{background:#ffc857;color:#1a1405;border-color:#ffc857}"
+    },
+    {
+      "name": "Quiet Button",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "Borderless toolbar and row action.",
+      "html": "<button class=\"ds-btn ds-btn-quiet\">Contents</button>",
+      "css": ".ds-btn{font:500 12px/1 system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;display:inline-flex;align-items:center;gap:.6rem;padding:.85rem 1.2rem;border:1px solid #3a4150;border-radius:3px;background:transparent;color:#e6e6e8;cursor:pointer;transition:border-color .2s cubic-bezier(.16,1,.3,1),color .2s cubic-bezier(.16,1,.3,1),background .2s cubic-bezier(.16,1,.3,1)}.ds-btn:hover{border-color:#a4a9b3}.ds-btn:focus-visible{border-color:#ffc857;color:#ffc857;outline:none}.ds-btn-quiet{border-color:transparent;color:#a4a9b3;padding-inline:.6rem}.ds-btn-quiet:hover{border-color:transparent;color:#e6e6e8}"
+    },
+    {
+      "name": "Search Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Sidebar search: hairline box, amber on focus.",
+      "html": "<form class=\"ds-search\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"><circle cx=\"11\" cy=\"11\" r=\"6.5\"/><path d=\"M16 16l4 4\"/></svg><input placeholder=\"Search titles, authors\"></form>",
+      "css": ".ds-search{display:flex;align-items:center;gap:.55rem;padding:0 .7rem;border:1px solid #262c38;border-radius:3px;color:#858b96;background:#0b0e13;width:14rem}.ds-search:focus-within{border-color:#ffc857;color:#ffc857}.ds-search input{border:0;outline:none;padding:.65rem 0;background:transparent;flex:1;color:#e6e6e8;font:400 14px/1.2 system-ui,sans-serif}.ds-search input::placeholder{color:#858b96}"
+    },
+    {
+      "name": "Sidebar Nav",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "Label-type rows; current item amber on surface.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-i ds-on\" href=\"#\">The wall</a><a class=\"ds-nav-i\" href=\"#\">Reading <span>5</span></a><a class=\"ds-nav-i\" href=\"#\">Unread <span>1,128</span></a></nav>",
+      "css": ".ds-nav{display:flex;flex-direction:column;gap:.1rem;width:13rem;background:#0b0e13;padding:.5rem}.ds-nav-i{display:flex;padding:.5rem .6rem;border-radius:3px;color:#a4a9b3;font:500 12px/1.2 system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;text-decoration:none}.ds-nav-i span{margin-left:auto;color:#858b96;letter-spacing:.02em}.ds-nav-i:hover{color:#e6e6e8;background:#151922}.ds-on,.ds-on:hover{color:#ffc857;background:#151922}.ds-nav-i:focus-visible{outline:1px solid #ffc857;outline-offset:2px}"
+    },
+    {
+      "name": "Wall Tile",
+      "kind": "custom",
+      "refersTo": "tile",
+      "description": "Cover that widens into a card on hover or focus.",
+      "html": "<a class=\"ds-tile\" href=\"#\"><div class=\"ds-tile-art\"></div><div class=\"ds-tile-info\"><h3>Dune Messiah</h3><p class=\"ds-by\">Frank Herbert</p><p class=\"ds-meta\">EPUB · 34 ch.</p><p class=\"ds-st\">Reading · 32%</p></div></a>",
+      "css": ".ds-tile{display:flex;width:9.5rem;height:14.25rem;border:1px solid transparent;border-radius:4px;background:#151922;overflow:hidden;text-decoration:none;color:#e6e6e8;transition:width .5s cubic-bezier(.16,1,.3,1),border-color .3s cubic-bezier(.16,1,.3,1),box-shadow .5s cubic-bezier(.16,1,.3,1)}.ds-tile-art{flex:0 0 9.5rem;background:linear-gradient(#2a4a38,#1c3326)}.ds-tile-info{flex:1;min-width:0;padding:1.1rem 1.1rem 1rem;display:flex;flex-direction:column;gap:.45rem;opacity:0;transition:opacity .2s ease}.ds-tile h3{margin:0;font:400 1.9rem/.95 'Bebas Neue','Arial Narrow',sans-serif;text-transform:uppercase;letter-spacing:.02em}.ds-by{margin:0;color:#a4a9b3;font-size:13px}.ds-meta{margin:0;color:#858b96;font-size:12px;letter-spacing:.04em}.ds-st{margin:auto 0 0;font:500 11px/1 system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#ffc857}.ds-tile:hover,.ds-tile:focus-visible{width:26rem;border-color:#ffc857;box-shadow:0 12px 32px rgba(0,0,0,.55);outline:none}.ds-tile:hover .ds-tile-info,.ds-tile:focus-visible .ds-tile-info{opacity:1;transition-delay:.15s}"
+    },
+    {
+      "name": "Grid Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Grid cover that lifts instead of widening.",
+      "html": "<a class=\"ds-card\" href=\"#\"><div class=\"ds-card-art\"><span class=\"ds-bar\"><span></span></span></div><span class=\"ds-t\">Conan the Defender</span><span class=\"ds-s\">Robert Jordan</span></a>",
+      "css": ".ds-card{display:flex;flex-direction:column;gap:.35rem;width:9.5rem;text-decoration:none;color:#e6e6e8}.ds-card-art{position:relative;aspect-ratio:2/3;border-radius:4px;overflow:hidden;border:1px solid transparent;background:#3a2a24;transition:border-color .25s cubic-bezier(.16,1,.3,1),transform .4s cubic-bezier(.16,1,.3,1),box-shadow .4s cubic-bezier(.16,1,.3,1)}.ds-bar{position:absolute;left:0;right:0;bottom:0;height:3px;background:rgba(11,14,19,.7)}.ds-bar span{display:block;height:100%;width:40%;background:#ffc857}.ds-card:hover .ds-card-art,.ds-card:focus-visible .ds-card-art{border-color:#ffc857;transform:translateY(-3px);box-shadow:0 14px 30px rgba(0,0,0,.5)}.ds-card:focus-visible{outline:none}.ds-t{font:500 13.5px/1.3 system-ui,sans-serif}.ds-card:hover .ds-t{color:#ffc857}.ds-s{font-size:12px;color:#858b96}"
+    },
+    {
+      "name": "Title Plate",
+      "kind": "custom",
+      "refersTo": "title-plate",
+      "description": "Stand-in for a missing cover at cover proportions.",
+      "html": "<div class=\"ds-plate\"><span class=\"ds-pt\">Star Trek: Deep Space 9</span><span class=\"ds-pb\">Unknown</span><span class=\"ds-pf\">epub</span></div>",
+      "css": ".ds-plate{width:9.5rem;aspect-ratio:2/3;display:flex;flex-direction:column;gap:.5rem;padding:.9rem .8rem;background:#1f2430;border-top:3px solid #323a4a;border-radius:4px}.ds-pt{font:400 1.35rem/.95 'Bebas Neue','Arial Narrow',sans-serif;text-transform:uppercase;color:#e6e6e8}.ds-pb{font-size:11px;color:#a4a9b3}.ds-pf{margin-top:auto;font:500 10px/1 system-ui,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:#858b96}"
+    },
+    {
+      "name": "Tag",
+      "kind": "chip",
+      "refersTo": "tag",
+      "description": "Outline chip linking to a filtered wall.",
+      "html": "<a class=\"ds-tag\" href=\"#\">Science Fiction</a>",
+      "css": ".ds-tag{font:400 12px/1.5 system-ui,sans-serif;padding:.3rem .65rem;border:1px solid #262c38;border-radius:3px;color:#a4a9b3;text-decoration:none}.ds-tag:hover{border-color:#ffc857;color:#ffc857}.ds-tag:focus-visible{outline:1px solid #ffc857;outline-offset:2px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Catalog Wall",
+    "overview": "Armarium is a dark wall of real covers: a cool near-black ground, two lifted grey-blue surfaces and hairline rules, with covers supplying every colour. A hovered or focused cover widens in place into a card that says what it is. Headings are Bebas Neue capitals; data is system UI with tabular figures. One amber marks where you are and what reads; everything else is a neutral outline. The same ground carries into the reader and viewer.",
+    "keyCharacteristics": [
+      "Covers are the only colour",
+      "Amber reserved for focus, current nav, progress and reading actions",
+      "Condensed caps for headings, system UI for data",
+      "Flat tonal chrome; soft shadows only on lifted covers",
+      "Gradients only as scrims over cover imagery"
+    ],
+    "rules": [
+      {
+        "name": "The Covers-Are-The-Colour Rule",
+        "body": "No hue enters the chrome; colour comes from cover images.",
+        "section": "colors"
+      },
+      {
+        "name": "The Amber Reservation Rule",
+        "body": "Amber at rest means current location, progress or a reading action; every other button is a neutral outline. A second amber button on one screen is a bug.",
+        "section": "colors"
+      },
+      {
+        "name": "The Caps-Name, System-Count Rule",
+        "body": "Every heading is Bebas Neue caps; no data in Bebas, no heading in the system face.",
+        "section": "typography"
+      },
+      {
+        "name": "The Caption-Follows Rule",
+        "body": "Caption caps follow or sit beside what they describe; never above a heading as its label.",
+        "section": "typography"
+      },
+      {
+        "name": "The Scrim-Only Gradient Rule",
+        "body": "Gradients only lay the ground over cover imagery.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Known Limit",
+        "body": "The blurred own-cover hero backdrop reads as a dim streak on mostly-black covers; accepted, not to be compensated with tint or opacity.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do let covers carry all colour",
+      "Do mark focus with a 1px amber outline at 2px offset",
+      "Do give coverless items a title plate",
+      "Do keep reading actions amber and everything else neutral outline",
+      "Do style via classes and Svelte style: directives; the CSP forbids inline style attributes",
+      "Do self-host fonts",
+      "Do honour prefers-reduced-motion"
+    ],
+    "donts": [
+      "Don't use a second amber button on a screen",
+      "Don't put gradients on chrome",
+      "Don't set headings in the system face or data in Bebas Neue",
+      "Don't set a caps caption above a heading as its label",
+      "Don't shadow flat chrome",
+      "Don't use hard offset or tinted shadows",
+      "Don't let a book's stylesheet win on measure, margins or body size"
+    ]
+  }
+}

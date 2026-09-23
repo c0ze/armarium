@@ -1,6 +1,8 @@
 <script lang="ts">
   import { api, type Item, type Series } from '../lib/api';
-  import ItemCard from './ItemCard.svelte';
+  import { link } from '../lib/router.svelte';
+  import Card from './Card.svelte';
+  import Icon from './Icon.svelte';
 
   let { id }: { id: number } = $props();
   let series = $state<Series | null>(null);
@@ -11,29 +13,30 @@
     api.seriesDetail(id).then((d) => { series = d.series; items = d.items; }).catch((e) => (error = e.message));
   });
 
-  // Continue with the first item that is not finished.
+  // Carry on with the first item that is not finished.
   const next = $derived(items.find((i) => i.progress.status !== 'read'));
+  const read = $derived(items.filter((i) => i.progress.status === 'read').length);
 </script>
 
-<main>
-  {#if error}<p class="error">{error}</p>{/if}
-  {#if series}
-    <div class="head">
-      <div>
-        <h1>{series.name}</h1>
-        <p class="muted small">{series.items} items · {series.unread} unread</p>
-      </div>
-      {#if next}<a class="button primary" href="/item/{next.id}">Continue: {next.title}</a>{/if}
+{#if error}<p class="error">{error}</p>{/if}
+{#if series}
+  <header class="head">
+    <div>
+      <h1>{series.name}</h1>
+      <p class="caps">{series.items} items · {read} read · {series.unread} to go</p>
     </div>
-    <div class="grid">
-      {#each items as it (it.id)}<ItemCard item={it} />{/each}
-    </div>
-  {/if}
-</main>
+    {#if next}
+      <a class="button primary" href="/item/{next.id}" use:link><Icon name="play" size={14} /> {next.progress.page ? 'Continue' : 'Start'}: {next.title}</a>
+    {/if}
+  </header>
+  <div class="grid">
+    {#each items as it (it.id)}<Card item={it} />{/each}
+  </div>
+{/if}
 
 <style>
-  main { max-width: 76rem; margin: 0 auto; }
-  .head { display: flex; justify-content: space-between; align-items: end; gap: 1rem; flex-wrap: wrap; margin: 0.5rem 0 1.2rem; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: 1.2rem 1rem; }
-  @media (max-width: 40rem) { .grid { grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr)); } }
+  .head { display: flex; justify-content: space-between; align-items: flex-end; gap: 2rem; flex-wrap: wrap; padding: 2.8rem 0 1.6rem; margin-bottom: 1.8rem; border-bottom: 1px solid var(--line); }
+  h1 { font-size: clamp(3rem, 5vw, 4.6rem); margin-bottom: 0.7rem; }
+  .button { max-width: 28rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: 1.6rem 1.1rem; padding-bottom: 3rem; }
 </style>

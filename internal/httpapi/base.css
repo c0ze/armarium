@@ -1,31 +1,39 @@
 /* Reader defaults for sanitized EPUB chapters. The parent page tunes these
-   variables on the iframe's root element; book stylesheets load after this. */
+   variables on the iframe's root element; book stylesheets load after this.
+   Dark is the default (the app's ground); the parent removes .dark for paper. */
 :root {
   --armarium-font-size: 1.1rem;
   --armarium-line-height: 1.6;
   --armarium-bg: #fbf8f1;
   --armarium-fg: #1f1d1a;
   --armarium-link: #7a4b12;
-  --armarium-measure: 38em;
+  --armarium-measure: 34em;
   color-scheme: light;
 }
 :root.dark {
-  --armarium-bg: #16181d;
-  --armarium-fg: #d9d6cf;
-  --armarium-link: #e0b36b;
+  --armarium-bg: #0b0e13;
+  --armarium-fg: #e6e6e8;
+  --armarium-link: #ffc857;
   color-scheme: dark;
 }
 html { background: var(--armarium-bg); }
+/* The column is the reader's, not the book's: books ship side margins (one sets
+   body { margin-right: 25px }) that push the text off centre, so these win. */
 body {
-  margin: 0 auto;
-  padding: 2rem 1.25rem 4rem;
-  max-width: var(--armarium-measure);
+  margin: 0 auto !important;
+  padding: 2.5rem 1.5rem 5rem !important;
+  max-width: var(--armarium-measure) !important;
   color: var(--armarium-fg);
   background: var(--armarium-bg);
   font: var(--armarium-font-size)/var(--armarium-line-height) Georgia, "Iowan Old Style", "Noto Serif", serif;
   overflow-wrap: break-word;
 }
+/* Text size is the reader's too: books shrink body copy (0.8em wrappers), which
+   stretches the line past the measure. Headings and small print keep theirs. */
+body *:not(h1, h2, h3, h4, h5, h6, sup, sub, small) { font-size: inherit !important; }
+:root.dark body, :root.dark body * { color: var(--armarium-fg) !important; background-color: transparent !important; }
 a { color: var(--armarium-link); }
 img { max-width: 100%; height: auto; }
 pre { white-space: pre-wrap; }
 table { max-width: 100%; }
+::selection { background: #ffc857; color: #1a1405; }

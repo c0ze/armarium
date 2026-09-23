@@ -2,6 +2,7 @@
   import { onDestroy } from 'svelte';
   import { api, pageUrl, type Item } from '../lib/api';
   import { link } from '../lib/router.svelte';
+  import Icon from './Icon.svelte';
 
   // A plain page viewer for when PanelFlow isn't at hand. Progress uses the same
   // monotonic endpoint PanelFlow does, so both stay in step.
@@ -57,10 +58,10 @@
 
 <div class="viewer">
   <header>
-    <a href="/item/{id}" use:link aria-label="Back">←</a>
+    <a class="back" href="/item/{id}" use:link aria-label="Back to the item"><Icon name="back" /></a>
     <span class="title">{item?.title ?? ''}</span>
-    <span class="small">{item ? `${page} / ${item.pages}` : ''}</span>
-    <button onclick={toggleFit}>Fit {fit === 'height' ? 'width' : 'height'}</button>
+    <span class="caps">{item ? `${page} / ${item.pages}` : ''}</span>
+    <button class="quiet" onclick={toggleFit}>Fit {fit === 'height' ? 'width' : 'height'}</button>
   </header>
   {#if error}<p class="error">{error}</p>{/if}
   {#if item && item.format !== 'cbz' && item.format !== 'cbr'}
@@ -75,16 +76,16 @@
 </div>
 
 <style>
-  .viewer { height: 100dvh; display: flex; flex-direction: column; background: #0d1014; color: #e2e8f0; }
-  header { display: flex; align-items: center; gap: 0.6rem; padding: 0.45rem 0.8rem; }
-  header a { color: inherit; text-decoration: none; font-size: 1.2rem; }
-  header button { padding: 0.3rem 0.6rem; font-size: 0.85rem; }
-  .title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+  .viewer { height: 100dvh; display: flex; flex-direction: column; background: #050608; color: var(--text); }
+  header { display: flex; align-items: center; gap: 0.8rem; padding: 0.55rem 1rem; border-bottom: 1px solid var(--line); background: var(--ground); }
+  .back { display: inline-flex; padding: 0.4rem; color: var(--text-2); }
+  .back:hover { color: var(--amber); }
+  .title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: var(--display); font-size: 1.5rem; letter-spacing: 0.03em; text-transform: uppercase; }
   .stage { flex: 1; min-height: 0; display: flex; justify-content: center; align-items: center; overflow: auto; cursor: pointer; user-select: none; }
   .stage img { max-height: 100%; max-width: 100%; object-fit: contain; }
   .stage.width { align-items: flex-start; }
   .stage.width img { max-height: none; width: min(100%, 60rem); }
   .notice { text-align: center; margin-top: 30vh; }
-  .notice a { color: var(--accent-primary); }
-  input[type='range'] { margin: 0.4rem 1rem 0.8rem; }
+  .notice a { color: var(--amber); }
+  input[type='range'] { margin: 0.6rem 1.2rem 0.9rem; padding: 0; border: 0; background: transparent; accent-color: var(--amber); }
 </style>

@@ -1,0 +1,131 @@
+{
+  "title": "Choose Armarium's visual world",
+  "question": "The roll assigned the Tape-Trade Zine. Keep it, take an alternate, or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "Tape-Trade Zine",
+      "kicker": "THE ROLL",
+      "lineage": "1990s xeroxed black-metal and tape-trading zines",
+      "thesis": "The collection kept like a photocopied zine's tape list: typed, stamped, cut and pasted, in toner black and copy-paper white.",
+      "palette": ["#0b0b0b", "#f1efe9", "#8c8a84", "#b3261e"],
+      "materials": ["photocopy toner and grain", "typewriter face", "rubber stamps", "cut-paper edges"],
+      "viewport": "Each library a xeroxed page: cut-paper masthead, typed tape-list rows, covers as halftone thumbs that turn full colour on focus, states rubber-stamped.",
+      "risk": "Reads as costume if the grit leaks into controls; text must stay typewriter-crisp and the grain stay in the ground.",
+      "raised": [
+        {"from": "challenger-wall", "raise": "Covers are the only full colour on the page; everything else is toner."},
+        {"from": "challenger-cracktro", "raise": "State rides one variable everywhere: the stamp (none, READING, READ, MISSING, BROKEN)."},
+        {"from": "challenger-darkroom", "raise": "Destructive acts (revoke a token, mark unread) take a marked two-step commit."},
+        {"from": "challenger-miura", "raise": "Rows unfold in place into the full item record instead of navigating away."},
+        {"from": "challenger-cloud", "raise": "The text field stays achromatic; red lives only in stamps and the focus edge."}
+      ]
+    },
+    {
+      "id": "model-pick",
+      "label": "Accession Register",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "library card catalogues and accession ledgers",
+      "thesis": "The collection as a working library's register: drawer tabs, ruled ledger columns, date-due stamps.",
+      "palette": ["#d9c9a3", "#5a3b24", "#1d1d1f", "#4b3f8f"],
+      "materials": ["manila card stock", "oak drawer fronts", "brass label holders", "violet date-due stamp"],
+      "viewport": "Drawer-front tabs for the libraries across the top, a ruled ledger of items with accession numbers, shelfmarks and stamped status, small covers at the left edge.",
+      "risk": "The most familiar direction on the table: card-catalogue nostalgia is where library tools usually land."
+    },
+    {
+      "id": "challenger-timetable",
+      "label": "Timetable Rack",
+      "verdict": "competitive",
+      "lineage": "1971 pocket airline timetables on a light table",
+      "thesis": "One type size for everything; rank carried by weight, case, reversal and rule.",
+      "palette": ["#d9a21b", "#1a1a1a", "#efe8d5", "#d8392b", "#1f5c3a"],
+      "materials": ["tinted glass slides", "lit goldenrod bed", "condensed grotesque"],
+      "viewport": "One continuous rack of library blocks; items as departure lines with format codes and filled or hollow status marks.",
+      "case": "Fuses cleanly for dense management (formats as codes, state as marks); loses on audience identification.",
+      "risk": "The rake and single size fight long book titles and 13,000-item scrolls.",
+      "hero": "https://impeccable.style/worlds/cards/rw-timetable-slide-rack-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/rw-timetable-slide-rack.webp"
+    },
+    {
+      "id": "challenger-wall",
+      "label": "Streaming Title Wall",
+      "verdict": "declined",
+      "lineage": "streaming-service poster rows",
+      "thesis": "Rows of artwork; the focused tile grows and tells you what it is.",
+      "palette": ["#0e0f12", "#ffffff", "#e50914"],
+      "materials": ["full-bleed posters", "dimmed rows"],
+      "viewport": "Horizontal rails per library, metadata only inside the focused tile.",
+      "case": "Loses both axes: it is the Plex/Kavita look being replaced, and it hides the state management needs.",
+      "kept": "Covers as the only colour.",
+      "risk": "Indistinguishable from the media servers it replaces.",
+      "hero": "https://impeccable.style/worlds/cards/pop-culture-shelf-streaming-title-card-wall-hero.webp"
+    },
+    {
+      "id": "challenger-cracktro",
+      "label": "Cracktro Queue",
+      "verdict": "declined",
+      "lineage": "demoscene cracktro title screens",
+      "thesis": "Rank is depth: brightness, spacing and drift, never boxes.",
+      "palette": ["#000000", "#f2ecd9", "#6d6d6d", "#ffb000"],
+      "materials": ["bitmap face", "drifting dust fields"],
+      "viewport": "One still ivory line of work over drifting layers.",
+      "case": "Loses both axes: drift and no-enclosure fight a dense management table.",
+      "kept": "State carried by one consistent variable.",
+      "risk": "Unreadable at collection scale.",
+      "hero": "https://impeccable.style/worlds/cards/operate-c-cracktro-scroller-queue-hero.webp"
+    },
+    {
+      "id": "challenger-darkroom",
+      "label": "Darkroom Bay",
+      "verdict": "declined",
+      "lineage": "print darkroom under safelight",
+      "thesis": "Work moves through stations; past marked points it is irreversible.",
+      "palette": ["#c9661c", "#1c1a18", "#bdbab3"],
+      "materials": ["amber safelight", "wet silver prints"],
+      "viewport": "Stations from compose to dry.",
+      "case": "Loses both axes: the collection has no station pipeline.",
+      "kept": "Marked commit points before irreversible acts.",
+      "risk": "A metaphor with no job here.",
+      "hero": "https://impeccable.style/worlds/cards/signals-instruments-darkroom-safelight-bay-hero.webp"
+    },
+    {
+      "id": "challenger-miura",
+      "label": "Miura Sheet",
+      "verdict": "declined",
+      "lineage": "deployable Miura-fold sheets",
+      "thesis": "One pull deploys a packet into a full field.",
+      "palette": ["#f7f7f5", "#c9a646", "#8a8580", "#9cc3d9"],
+      "materials": ["scored paper", "gold foil packet"],
+      "viewport": "Packet, cell, row, sheet.",
+      "case": "Loses both axes: folding geometry adds nothing to finding a book.",
+      "kept": "Compact to deployed in place.",
+      "risk": "Geometry as decoration.",
+      "hero": "https://impeccable.style/worlds/cards/paper-folds-pleats-deployable-miura-orbit-sheet-hero.webp"
+    },
+    {
+      "id": "challenger-cloud",
+      "label": "Iridescent Edge",
+      "verdict": "declined",
+      "lineage": "cloud iridescence",
+      "thesis": "Colour lives only at the edge; the field stays white.",
+      "palette": ["#fbfbfa", "#5d6570", "#9fe0c9", "#e6a6c7", "#9b86d6"],
+      "materials": ["hairline spectral bands"],
+      "viewport": "Achromatic field, banded edges.",
+      "case": "Loses both axes: pastel science-journal register, far from the owner's world.",
+      "kept": "Colour confined to edges and covers.",
+      "risk": "Too faint for state at a glance.",
+      "hero": "https://impeccable.style/worlds/cards/clouds-storms-auroras-iridescent-cloud-edge-hero.webp"
+    }
+  ],
+  "reroll": {"registers": ["safer", "bolder"]},
+  "buildPath": {"value": "code", "toggle": false},
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "What self-hosted media servers ship (Kavita, Komga, Jellyfin), executed impeccably.",
+    "palette": ["#101418", "#1c232b", "#e6e9ec", "#4a90e2"],
+    "materials": ["dark slate panels", "poster grid", "library sidebar"],
+    "viewport": "Library sidebar, a dark poster grid, a detail drawer.",
+    "risk": "Indistinguishable from the apps it replaces, by design."
+  },
+  "steer": true
+}

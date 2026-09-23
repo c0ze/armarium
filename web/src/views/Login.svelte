@@ -14,41 +14,38 @@
       await api.login(password);
       onLogin();
     } catch (err) {
-      error = err instanceof ApiError ? err.message : 'Login failed.';
+      error = err instanceof ApiError && err.status === 401 ? 'That password is not right.' : err instanceof ApiError ? err.message : 'Login failed.';
     } finally {
       busy = false;
     }
   }
 </script>
 
-<main class="panel login">
-  <h1>Arma<span>rium</span></h1>
+<main class="login">
+  <h1>Armarium</h1>
   {#if session.passwordSet}
     <form onsubmit={submit}>
-      <label for="pw" class="visually-hidden">Password</label>
+      <label for="pw" class="caps">Owner password</label>
       <!-- svelte-ignore a11y_autofocus -->
-      <input id="pw" type="password" autocomplete="current-password" placeholder="Password" bind:value={password} autofocus />
-      <button class="primary" disabled={busy || !password}>Sign in</button>
+      <input id="pw" type="password" autocomplete="current-password" bind:value={password} autofocus />
+      <button disabled={busy || !password}>{busy ? 'Opening' : 'Open the armarium'}</button>
+      {#if error}<p class="error" role="alert">{error}</p>{/if}
     </form>
-    {#if error}<p class="error small">{error}</p>{/if}
   {:else}
     <p class="muted">
-      No password is configured. Run <code>armarium hash-password</code> and put the result in
-      <code>password_hash</code> in <code>armarium.toml</code> (or <code>ARMARIUM_PASSWORD_HASH</code>), then restart.
+      No password is set. Run <code>armarium hash-password</code>, put the result in
+      <code>password_hash</code> in <code>armarium.toml</code> (or <code>ARMARIUM_PASSWORD_HASH</code>), and restart.
     </p>
   {/if}
 </main>
 
 <style>
-  .login { max-width: 22rem; margin: 18vh auto 0; text-align: center; }
-  h1 { font-size: 2rem; margin-bottom: 1.2rem; }
-  h1 span {
-    background: linear-gradient(100deg, var(--accent-primary), var(--accent-secondary));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
-  form { display: flex; flex-direction: column; gap: 0.7rem; }
+  .login { min-height: 100dvh; display: grid; place-content: center; justify-items: center; gap: 2.4rem; padding: 2rem; }
+  h1 { font-size: clamp(4.5rem, 12vw, 9rem); letter-spacing: 0.06em; }
+  form { display: grid; gap: 0.8rem; width: min(22rem, 90vw); }
+  input { padding: 0.9rem 1rem; font-size: 16px; }
   button { justify-content: center; }
-  code { font-size: 0.85em; }
+  .error { margin: 0; font-size: 13px; }
+  p.muted { max-width: 30rem; text-align: center; }
+  code { font-size: 0.9em; color: var(--text); }
 </style>

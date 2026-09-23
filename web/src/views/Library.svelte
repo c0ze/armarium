@@ -1,12 +1,11 @@
 <script lang="ts">
-  import { api, coverUrl, type Facet, type Item, type Library, type Series } from '../lib/api';
-  import { link, navigate } from '../lib/router.svelte';
-  import ItemCard from './ItemCard.svelte';
+  import { api, type Facet, type Item, type Library, type Series } from '../lib/api';
+  import { navigate } from '../lib/router.svelte';
+  import Card from './Card.svelte';
 
-  let { params }: { params: URLSearchParams } = $props();
+  let { params, libraries }: { params: URLSearchParams; libraries: Library[] } = $props();
 
   const PAGE = 60;
-  let libraries = $state<Library[]>([]);
   let sources = $state<Facet[]>([]);
   let tags = $state<Facet[]>([]);
   let items = $state<Item[]>([]);
@@ -22,13 +21,13 @@
   const tag = $derived(params.get('tag') ?? '');
   const sort = $derived(params.get('sort') ?? '');
   const current = $derived(libraries.find((l) => l.id === library));
-  // Comics are browsed by series; filters and search switch to a flat item grid.
+  // Comics libraries open on their series; any filter drops to single items.
   const bySeries = $derived(current?.kind === 'comics' && !q && !status && !source && !tag && !sort);
+  const heading = $derived(
+    current?.name ?? (q ? `“${q}”` : status ? { reading: 'Reading', unread: 'Unread', read: 'Read' }[status] ?? status
+      : sort === 'added' ? 'Recently added' : 'Everything'),
+  );
 
-  let search = $state('');
-  $effect(() => { search = q; });
-
-  api.libraries().then((l) => (libraries = l)).catch((e) => (error = e.message));
   $effect(() => {
     api.facets(library || undefined).then((f) => { sources = f.sources; tags = f.tags; }).catch(() => {});
   });
@@ -57,107 +56,65 @@
     const next = new URLSearchParams(params);
     if (value) next.set(key, String(value));
     else next.delete(key);
-    if (key === 'library') { next.delete('source'); next.delete('tag'); }
-    navigate(`/?${next}`, key === 'q');
-  }
-
-  let timer: ReturnType<typeof setTimeout>;
-  function onSearch() {
-    clearTimeout(timer);
-    timer = setTimeout(() => set('q', search.trim()), 250);
+    navigate(`/?${next}`, true);
   }
 </script>
 
-<main>
-  <div class="tabs" role="tablist">
-    <button role="tab" aria-selected={!library} class:active={!library} onclick={() => set('library', 0)}>All</button>
-    {#each libraries as l (l.id)}
-      <button role="tab" aria-selected={library === l.id} class:active={library === l.id} onclick={() => set('library', l.id)}>{l.name}</button>
+<header class="head">
+  <h1>{heading}</h1>
+  <p class="count caps">{total.toLocaleString()} {bySeries ? 'series' : total === 1 ? 'item' : 'items'}{loading ? ' · loading' : ''}</p>
+</header>
+
+<div class="tools">
+  <div class="seg" role="group" aria-label="Reading status">
+    {#each [['', 'All'], ['unread', 'Unread'], ['reading', 'Reading'], ['read', 'Read']] as [v, label] (v)}
+      <button class:on={status === v} aria-pressed={status === v} onclick={() => set('status', v)}>{label}</button>
     {/each}
   </div>
-
-  <div class="filters">
-    <input type="search" placeholder="Search titles, authors and series" aria-label="Search" bind:value={search} oninput={onSearch} />
-    <select aria-label="Status" value={status} onchange={(e) => set('status', e.currentTarget.value)}>
-      <option value="">Any status</option>
-      <option value="unread">Unread</option>
-      <option value="reading">Reading</option>
-      <option value="read">Read</option>
+  {#if sources.length}
+    <select aria-label="Source" value={source} onchange={(e) => set('source', e.currentTarget.value)}>
+      <option value="">All sources</option>
+      {#each sources as s (s.name)}<option value={s.name}>{s.label || s.name} ({s.count})</option>{/each}
     </select>
-    {#if sources.length}
-      <select aria-label="Source" value={source} onchange={(e) => set('source', e.currentTarget.value)}>
-        <option value="">All sources</option>
-        {#each sources as s (s.name)}<option value={s.name}>{s.label || s.name} ({s.count})</option>{/each}
-      </select>
-    {/if}
-    {#if tags.length}
-      <select aria-label="Tag" value={tag} onchange={(e) => set('tag', e.currentTarget.value)}>
-        <option value="">All tags</option>
-        {#each tags as t (t.name)}<option value={t.name}>{t.name} ({t.count})</option>{/each}
-      </select>
-    {/if}
-    <select aria-label="Sort" value={sort} onchange={(e) => set('sort', e.currentTarget.value)}>
-      <option value="">Series order</option>
-      <option value="title">Title</option>
-      <option value="added">Recently added</option>
-      <option value="recent">Recently read</option>
+  {/if}
+  {#if tags.length}
+    <select aria-label="Tag" value={tag} onchange={(e) => set('tag', e.currentTarget.value)}>
+      <option value="">All tags</option>
+      {#each tags as t (t.name)}<option value={t.name}>{t.name} ({t.count})</option>{/each}
     </select>
-  </div>
-
-  {#if error}<p class="error">{error}</p>{/if}
-  <p class="muted small count">{total} {bySeries ? 'series' : 'items'}{loading ? ' · loading…' : ''}</p>
-
-  {#if bySeries}
-    <div class="grid">
-      {#each series as s (s.id)}
-        <a class="series" href="/series/{s.id}" use:link>
-          <div class="cover">
-            {#if s.coverItemId}<img src={coverUrl(s.coverItemId)} alt="" loading="lazy" decoding="async" />{/if}
-          </div>
-          <span class="title">{s.name}</span>
-          <span class="muted small">{s.items} items{s.unread ? ` · ${s.unread} unread` : ''}</span>
-        </a>
-      {/each}
-    </div>
-  {:else}
-    <div class="grid">
-      {#each items as it (it.id)}<ItemCard item={it} />{/each}
-    </div>
-    {#if items.length < total}
-      <div class="more"><button onclick={more} disabled={loading}>Load more</button></div>
-    {/if}
   {/if}
-  {#if !loading && !error && total === 0}
-    <p class="muted empty">Nothing here yet. {#if !libraries.length}Add a library to <code>armarium.toml</code>, then scan it from Admin.{/if}</p>
-  {/if}
-</main>
+  <select aria-label="Sort" value={sort} onchange={(e) => set('sort', e.currentTarget.value)}>
+    <option value="">Series order</option>
+    <option value="title">Title</option>
+    <option value="added">Recently added</option>
+    <option value="recent">Recently read</option>
+  </select>
+</div>
+
+{#if error}<p class="error">{error}</p>{/if}
+
+<div class="grid">
+  {#each series as s (s.id)}<Card series={s} />{/each}
+  {#each items as it (it.id)}<Card item={it} />{/each}
+</div>
+
+{#if !bySeries && items.length < total}
+  <div class="more"><button onclick={more} disabled={loading}>Load {Math.min(PAGE, total - items.length)} more</button></div>
+{/if}
+{#if !loading && !error && total === 0}
+  <p class="empty muted">Nothing here. {#if !libraries.length}Add a library to <code>armarium.toml</code> and scan it from Admin.{/if}</p>
+{/if}
 
 <style>
-  main { max-width: 76rem; margin: 0 auto; }
-  .tabs { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.8rem; }
-  .tabs button { border-radius: 999px; padding: 0.35rem 0.9rem; }
-  .tabs button.active { background: linear-gradient(100deg, var(--accent-primary), var(--accent-secondary)); color: var(--button-text); border-color: transparent; }
-  .filters { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-  .filters input { flex: 1 1 16rem; }
-  .filters select { flex: 0 1 auto; max-width: 16rem; }
-  .count { margin: 0.8rem 0; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr)); gap: 1.2rem 1rem; }
-  .series { display: flex; flex-direction: column; gap: 0.3rem; color: inherit; text-decoration: none; min-width: 0; }
-  .series .cover {
-    aspect-ratio: 2 / 3;
-    border-radius: 8px;
-    overflow: hidden;
-    background: linear-gradient(160deg, var(--bg-gradient-1), var(--bg-gradient-3));
-    border: 1px solid var(--surface-border);
-    box-shadow: 4px 4px 0 -1px var(--surface-primary), 4px 4px 0 0 var(--surface-border), var(--shadow);
-  }
-  .series img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .series:hover .cover { outline: 2px solid var(--accent-primary); }
-  .title { font-weight: 600; font-size: 0.9rem; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .more { display: flex; justify-content: center; margin-top: 1.5rem; }
-  .empty { text-align: center; margin-top: 3rem; }
-  @media (max-width: 40rem) {
-    .filters select { flex: 1 1 calc(50% - 0.5rem); max-width: none; }
-    .grid { grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr)); gap: 1rem 0.7rem; }
-  }
+  .head { display: flex; align-items: baseline; gap: 1.5rem; flex-wrap: wrap; padding: 2.8rem 0 1.4rem; }
+  h1 { font-size: clamp(3rem, 5vw, 4.6rem); }
+  .tools { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; padding-bottom: 1.6rem; border-bottom: 1px solid var(--line); margin-bottom: 1.8rem; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; padding: 0.72rem 1rem; color: var(--text-2); }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button.on { color: var(--text); background: var(--raised); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: 1.6rem 1.1rem; }
+  .more { display: flex; justify-content: center; margin: 2.4rem 0 3rem; }
+  .empty { margin: 4rem 0; text-align: center; }
+  @media (max-width: 600px) { .grid { grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr)); gap: 1.2rem 0.8rem; } }
 </style>

@@ -154,6 +154,15 @@ export function formatSize(bytes: number): string {
   return `${(bytes / (1 << 30)).toFixed(2)} GB`;
 }
 
+const norm = (s: string) => s.trim().toLocaleLowerCase();
+
+/** The series worth naming for an item: none when it is only the author grouping
+ *  that Calibre libraries use for books outside a series. */
+export function seriesOf(it: Pick<Item, 'author' | 'seriesName'>): string {
+  const authors = it.author.split(',').map(norm);
+  return it.seriesName && !authors.includes(norm(it.seriesName)) ? it.seriesName : '';
+}
+
 /** Percent read, for progress bars. EPUB pages are chapters. */
 export function percent(it: Item): number {
   if (it.progress.status === 'read') return 100;

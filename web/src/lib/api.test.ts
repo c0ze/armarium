@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fileUrl, formatSize, percent, query, readable, type Item } from './api';
+import { fileUrl, formatSize, percent, query, readable, seriesOf, type Item } from './api';
 
 const item = (page: number, pages: number, status: Item['progress']['status'] = 'reading') =>
   ({ pages, progress: { page, status, locator: '', updatedAt: 0 } }) as Item;
@@ -21,6 +21,12 @@ describe('api helpers', () => {
     expect(fileUrl(3, false, 'mobi')).toBe('/api/items/3/file?format=mobi');
     expect(readable('epub')).toBe(true);
     expect(readable('mobi')).toBe(false);
+  });
+  it('names a series only when it is not the author grouping', () => {
+    expect(seriesOf({ author: 'Frank Herbert', seriesName: 'Dune' })).toBe('Dune');
+    expect(seriesOf({ author: 'John Jackson Miller', seriesName: 'John Jackson Miller ' })).toBe('');
+    expect(seriesOf({ author: 'S. D. Perry, Weddle', seriesName: 's. d. perry' })).toBe('');
+    expect(seriesOf({ author: '', seriesName: 'Saga' })).toBe('Saga');
   });
   it('formats sizes', () => {
     expect(formatSize(2048)).toBe('2 KB');
