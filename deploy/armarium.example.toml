@@ -1,0 +1,64 @@
+# Armarium configuration. Every key is optional unless marked required.
+# Environment variables override the file: ARMARIUM_LISTEN, ARMARIUM_DATA_DIR,
+# ARMARIUM_PASSWORD_HASH, ARMARIUM_ALLOWED_HOSTS and ARMARIUM_CORS_ORIGINS
+# (comma-separated). ARMARIUM_CONFIG names this file.
+
+# Address to listen on. In Docker, use 0.0.0.0:8580.
+listen = "127.0.0.1:8580"
+
+# Where the database and the cover cache live. The only place Armarium writes.
+data_dir = "./data"
+
+# Host names Armarium answers to (DNS-rebinding defence). Requests for any other
+# Host are refused. An entry without a port matches any port.
+allowed_hosts = ["localhost", "127.0.0.1"]   # add e.g. "books.example.com", "192.168.1.10"
+
+# Browser apps on other origins that may call the API with a token
+# (e.g. PanelFlow or comics.skriv.ist). Full origins, no trailing slash.
+cors_origins = []
+
+# Owner password for the web UI, as an argon2id hash: `armarium hash-password`.
+# Without it the UI cannot log in; API tokens still work.
+# password_hash = "$argon2id$v=19$m=65536,t=3,p=2$..."
+
+# Mark the session cookie Secure. Set to true when served over HTTPS.
+secure_cookie = false
+
+# Optional: where PanelFlow is served; comic pages then offer "Open in PanelFlow".
+# panelflow_url = "https://example.com/comics"
+
+[scan]
+workers = 2            # files opened in parallel while scanning; 1 on small NAS CPUs
+dir_sleep_ms = 20      # pause between directories to keep disk I/O gentle
+interval_hours = 0     # 0 = scan only on demand (Admin page or `armarium scan`)
+
+[limits]
+max_entry_bytes = 33554432    # largest page or resource read from an archive (32 MiB)
+max_image_pixels = 16000000   # covers are only decoded below this size
+max_entries = 50000           # files per archive
+max_open_archives = 4         # concurrent archive reads; 2 for a 256 MiB container
+
+# One [[library]] block per library. name and root are required; kind is
+# "comics" or "books". Folders become series; files are items.
+[[library]]
+name = "Comics"
+root = "/libraries/comics"
+kind = "comics"
+
+# A Calibre library: read metadata.db (titles, authors, series, tags, covers)
+# instead of walking folders. Each book is one item; other formats are extra
+# downloads.
+[[library]]
+name = "Books"
+root = "/libraries/calibre"
+kind = "books"
+calibre = true
+
+# A plain folder of ebooks. Optional extras:
+# [[library]]
+# name = "Downloads"
+# root = "/libraries/downloads"
+# kind = "books"
+# include = ["*_downloads"]   # only these top-level folders (globs)
+# labels = "/config/labels.json"  # {"folder": "Label"} or {"folder": {"label": "..", "year": 2015}}
+# tags = "/config/tags.json"      # {"relative/path.epub": ["Tag", ...]}

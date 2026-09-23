@@ -1,0 +1,31 @@
+/* Reader defaults for sanitized EPUB chapters. The parent page tunes these
+   variables on the iframe's root element; book stylesheets load after this. */
+:root {
+  --armarium-font-size: 1.1rem;
+  --armarium-line-height: 1.6;
+  --armarium-bg: #fbf8f1;
+  --armarium-fg: #1f1d1a;
+  --armarium-link: #7a4b12;
+  --armarium-measure: 38em;
+  color-scheme: light;
+}
+:root.dark {
+  --armarium-bg: #16181d;
+  --armarium-fg: #d9d6cf;
+  --armarium-link: #e0b36b;
+  color-scheme: dark;
+}
+html { background: var(--armarium-bg); }
+body {
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+  max-width: var(--armarium-measure);
+  color: var(--armarium-fg);
+  background: var(--armarium-bg);
+  font: var(--armarium-font-size)/var(--armarium-line-height) Georgia, "Iowan Old Style", "Noto Serif", serif;
+  overflow-wrap: break-word;
+}
+a { color: var(--armarium-link); }
+img { max-width: 100%; height: auto; }
+pre { white-space: pre-wrap; }
+table { max-width: 100%; }

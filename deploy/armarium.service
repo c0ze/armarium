@@ -1,0 +1,21 @@
+# systemd user unit: ~/.config/systemd/user/armarium.service
+# Put the binary in ~/.local/bin and the config in ~/.config/armarium/, then:
+#   systemctl --user daemon-reload && systemctl --user enable --now armarium
+[Unit]
+Description=Armarium library server
+Documentation=https://github.com/c0ze/armarium
+After=network-online.target
+
+[Service]
+Type=simple
+# %h (the home directory) keeps the unit portable between users.
+ExecStart=%h/.local/bin/armarium --config %h/.config/armarium/armarium.toml serve
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=%h/.local/share/armarium
+
+[Install]
+WantedBy=default.target

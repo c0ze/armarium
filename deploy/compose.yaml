@@ -1,0 +1,24 @@
+# Armarium with Docker Compose (also works as a Synology Container Manager
+# project). Library folders are mounted read-only; Armarium writes only to /data.
+#
+#   mkdir -p data && cp armarium.example.toml armarium.toml   # then edit it
+#   docker compose up -d
+services:
+  armarium:
+    image: ghcr.io/c0ze/armarium:latest   # or docker.io/coze/armarium:latest
+    container_name: armarium
+    # "always" rather than "unless-stopped": on Synology, unless-stopped
+    # containers stay down after Container Manager restarts.
+    restart: always
+    mem_limit: 256m
+    # The user that owns ./data. Synology's first user is usually 1026:100.
+    user: "1000:1000"
+    ports:
+      - "8580:8580"
+    volumes:
+      - ./armarium.toml:/config/armarium.toml:ro
+      - ./data:/data
+      - /path/to/comics:/libraries/comics:ro
+      - /path/to/calibre-library:/libraries/calibre:ro
+    environment:
+      - TZ=UTC

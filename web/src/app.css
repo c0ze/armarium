@@ -1,0 +1,113 @@
+/* PanelFlow / skriv.ist palette, so Armarium sits beside PanelFlow without a seam.
+   Light by default, dark follows the OS. */
+:root {
+  --bg-gradient-1: #dae8f3;
+  --bg-gradient-2: #f5f7f5;
+  --bg-gradient-3: #d5ecd0;
+  --text-primary: #1a2b3c;
+  --text-secondary: #5a6e7a;
+  --text-tertiary: #5f7280;
+  --accent-primary: #6a9fc0;
+  --accent-secondary: #7db88a;
+  --surface-primary: rgba(255, 255, 255, 0.9);
+  --surface-border: rgba(0, 0, 0, 0.06);
+  --button-text: #1a2b3c;
+  --input-bg: #ffffff;
+  --input-border: rgba(0, 0, 0, 0.1);
+  --input-focus-ring: rgba(106, 159, 192, 0.2);
+  --link-color: #4f86a8;
+  --divider: rgba(0, 0, 0, 0.06);
+  --danger: #b4493f;
+  --shadow: 0 1px 2px rgba(16, 0, 34, 0.04), 0 8px 24px rgba(16, 0, 34, 0.06);
+  --radius: 10px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-gradient-1: #10202c;
+    --bg-gradient-2: #0f1720;
+    --bg-gradient-3: #112219;
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-tertiary: #8a99ad;
+    --accent-primary: #7cb5d6;
+    --accent-secondary: #8ec99a;
+    --surface-primary: rgba(20, 30, 40, 0.85);
+    --surface-border: rgba(255, 255, 255, 0.08);
+    --button-text: #0f1923;
+    --input-bg: rgba(255, 255, 255, 0.05);
+    --input-border: rgba(255, 255, 255, 0.12);
+    --input-focus-ring: rgba(124, 181, 214, 0.25);
+    --link-color: #7cb5d6;
+    --divider: rgba(255, 255, 255, 0.08);
+    --danger: #e0786e;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background:
+    radial-gradient(1200px 800px at 12% -10%, var(--bg-gradient-1), transparent 60%),
+    radial-gradient(1000px 700px at 100% 0%, var(--bg-gradient-3), transparent 55%),
+    var(--bg-gradient-2);
+  background-attachment: fixed;
+  color: var(--text-primary);
+  font: 400 16px/1.55 'Lato', 'Noto Sans JP', 'Noto Sans', 'Hiragino Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { font-family: 'Playfair Display', Georgia, serif; letter-spacing: -0.01em; margin: 0; }
+a { color: var(--link-color); }
+*:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; border-radius: 4px; }
+
+button, .button {
+  font: inherit;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid var(--surface-border);
+  background: var(--surface-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-decoration: none;
+}
+button.primary, .button.primary {
+  background: linear-gradient(100deg, var(--accent-primary), var(--accent-secondary));
+  color: var(--button-text);
+  border: none;
+}
+button:disabled { opacity: 0.55; cursor: default; }
+button.danger { color: var(--danger); }
+
+input, select {
+  font: inherit;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--text-primary);
+  min-width: 0;
+}
+input:focus, select:focus { outline: none; box-shadow: 0 0 0 3px var(--input-focus-ring); }
+
+.panel {
+  background: var(--surface-primary);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.25rem;
+}
+
+.muted { color: var(--text-secondary); }
+.small { font-size: 0.85rem; }
+.error { color: var(--danger); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
