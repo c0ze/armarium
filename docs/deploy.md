@@ -40,7 +40,11 @@ The same compose file works as a Container Manager **Project**:
    `armarium.toml`, and put `compose.yaml` there.
 2. In the compose file, mount shares like `/volume1/comics:/libraries/comics:ro`,
    and set `user: "1026:100"` (the first DSM user and the `users` group; check
-   with `id` over SSH).
+   with `id` over SSH). Shared folders grant access through DSM groups, not
+   `users`: if covers and pages 404 while the scan finds files, add
+   `group_add: ["101"]` (`administrators`, or the group the share's
+   permissions name). Test with
+   `docker run --rm -u 1026:100 --group-add 101 -v /volume1/comics:/c:ro busybox ls /c`.
 3. Keep `restart: always`: containers set to `unless-stopped` stay down after
    Container Manager restarts.
 4. Keep `mem_limit: 256m` and set `max_open_archives = 2` under `[limits]` on
