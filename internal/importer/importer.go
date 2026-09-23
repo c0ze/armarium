@@ -8,9 +8,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"path"
+	"sort"
 	"strings"
 	"time"
 
+	"github.com/c0ze/armarium/internal/formats"
 	"github.com/c0ze/armarium/internal/store"
 )
 
@@ -126,37 +128,71 @@ func Kavita(ctx context.Context, st *store.Store, libraryID int64, dbPath, root 
 	if src.QueryRowContext(ctx, `SELECT COUNT(*) FROM pragma_table_info('AppUserProgresses') WHERE name = 'LastModifiedUtc'`).Scan(&n); n == 0 {
 		modified = "LastModified"
 	}
-	rows, err := src.QueryContext(ctx, `SELECT mf.FilePath, MAX(p.PagesRead), MAX(p.`+modified+`), MAX(c.Pages)
-		FROM AppUserProgresses p JOIN MangaFile mf ON mf.ChapterId = p.ChapterId JOIN Chapter c ON c.Id = p.ChapterId
-		GROUP BY mf.FilePath`)
+	// Kavita counts pages across all files of a chapter (one chapter can hold
+	// dozens of files), so the pages read are spread over the files in order.
+	rows, err := src.QueryContext(ctx, `SELECT p.ChapterId, MAX(p.PagesRead), MAX(p.`+modified+`), mf.FilePath, mf.Pages
+		FROM AppUserProgresses p JOIN MangaFile mf ON mf.ChapterId = p.ChapterId
+		GROUP BY p.ChapterId, mf.Id`)
 	if err != nil {
 		return res, fmt.Errorf("not a Kavita database: %w", err)
 	}
-	defer rows.Close()
-	prefix := strings.TrimSuffix(strings.ReplaceAll(root, `\`, "/"), "/") + "/"
+	type file struct {
+		path  string
+		pages int
+	}
+	type chapter struct {
+		read  int
+		stamp string
+		files []file
+	}
+	chapters := map[int64]*chapter{}
+	var order []int64
 	for rows.Next() {
-		var fp, stamp string
-		var read, pages int
-		if err := rows.Scan(&fp, &read, &stamp, &pages); err != nil {
+		var id int64
+		var c chapter
+		var f file
+		if err := rows.Scan(&id, &c.read, &c.stamp, &f.path, &f.pages); err != nil {
+			rows.Close()
 			return res, err
 		}
-		rel := path.Clean(strings.TrimPrefix(strings.ReplaceAll(fp, `\`, "/"), prefix))
-		k, ok := known[rel]
-		if !ok || read <= 0 {
-			res.Skipped++
-			continue
+		if chapters[id] == nil {
+			chapters[id] = &chapter{read: c.read, stamp: c.stamp}
+			order = append(order, id)
 		}
-		pr := store.Progress{Page: read, Status: "reading", UpdatedAt: kavitaTime(stamp)}
-		if pages > 0 && read >= pages {
-			pr.Page, pr.Status = pages, "read"
-		}
-		if ok, err := st.ImportProgress(ctx, k.ID, pr); err != nil {
-			return res, err
-		} else if ok {
-			res.Progress++
+		chapters[id].files = append(chapters[id].files, f)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return res, err
+	}
+	prefix := strings.TrimSuffix(strings.ReplaceAll(root, `\`, "/"), "/") + "/"
+	for _, id := range order {
+		c := chapters[id]
+		sort.Slice(c.files, func(i, j int) bool { return formats.NaturalLess(c.files[i].path, c.files[j].path) })
+		left := c.read
+		for _, f := range c.files {
+			if left <= 0 {
+				break // not reached yet: leave it unread
+			}
+			pr := store.Progress{Page: min(left, f.pages), Status: "reading", UpdatedAt: kavitaTime(c.stamp)}
+			if f.pages > 0 && left >= f.pages {
+				pr.Status = "read"
+			}
+			left -= f.pages
+			rel := path.Clean(strings.TrimPrefix(strings.ReplaceAll(f.path, `\`, "/"), prefix))
+			k, ok := known[rel]
+			if !ok {
+				res.Skipped++
+				continue
+			}
+			if ok, err := st.ImportProgress(ctx, k.ID, pr); err != nil {
+				return res, err
+			} else if ok {
+				res.Progress++
+			}
 		}
 	}
-	return res, rows.Err()
+	return res, nil
 }
 
 // kavitaTime parses EF Core's SQLite datetime text; unknown shapes count as now.

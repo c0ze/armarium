@@ -93,29 +93,43 @@ func TestSkrivistImport(t *testing.T) {
 }
 
 func TestKavitaImport(t *testing.T) {
-	st, lib, ids := setup(t, "comics", "Saga/Saga 01.cbz", "Saga/Saga 02.cbz")
+	st, lib, ids := setup(t, "comics", "Saga/Saga 01.cbz", "Saga/Saga 02.cbz",
+		"Pack/Part 1.cbz", "Pack/Part 2.cbz", "Pack/Part 10.cbz")
 	src := sourceDB(t,
 		`CREATE TABLE Chapter (Id INTEGER PRIMARY KEY, Pages INT)`,
-		`CREATE TABLE MangaFile (Id INTEGER PRIMARY KEY, FilePath TEXT, ChapterId INT)`,
+		`CREATE TABLE MangaFile (Id INTEGER PRIMARY KEY, FilePath TEXT, ChapterId INT, Pages INT)`,
 		`CREATE TABLE AppUserProgresses (Id INTEGER PRIMARY KEY, PagesRead INT, ChapterId INT, AppUserId INT, LastModifiedUtc TEXT)`,
-		`INSERT INTO Chapter VALUES (1, 10), (2, 10), (3, 5)`,
-		`INSERT INTO MangaFile VALUES (1, '/comics/Saga/Saga 01.cbz', 1), (2, '/comics/Saga/Saga 02.cbz', 2), (3, '/comics/Other/x.cbz', 3)`,
-		`INSERT INTO AppUserProgresses VALUES (1, 4, 1, 1, '2026-01-02 03:04:05.1234567'), (2, 10, 2, 1, '2026-01-02 03:04:05'), (3, 2, 3, 1, '2026-01-01 00:00:00')`,
+		`INSERT INTO Chapter VALUES (1, 10), (2, 10), (3, 5), (4, 30)`,
+		`INSERT INTO MangaFile VALUES (1, '/comics/Saga/Saga 01.cbz', 1, 10), (2, '/comics/Saga/Saga 02.cbz', 2, 10),
+		 (3, '/comics/Other/x.cbz', 3, 5),
+		 (4, '/comics/Pack/Part 10.cbz', 4, 10), (5, '/comics/Pack/Part 2.cbz', 4, 10), (6, '/comics/Pack/Part 1.cbz', 4, 10)`,
+		`INSERT INTO AppUserProgresses VALUES (1, 4, 1, 1, '2026-01-02 03:04:05.1234567'), (2, 10, 2, 1, '2026-01-02 03:04:05'),
+		 (3, 2, 3, 1, '2026-01-01 00:00:00'), (4, 13, 4, 1, '2026-01-03 00:00:00')`,
 	)
 	ctx := context.Background()
 	res, err := Kavita(ctx, st, lib, src, "/comics/")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Progress != 2 || res.Skipped != 1 {
+	if res.Progress != 4 || res.Skipped != 1 {
 		t.Fatalf("result %+v", res)
 	}
-	one, _ := st.Item(ctx, ids["Saga/Saga 01.cbz"])
-	two, _ := st.Item(ctx, ids["Saga/Saga 02.cbz"])
-	if one.Progress.Page != 4 || one.Progress.Status != "reading" || two.Progress.Status != "read" {
-		t.Fatalf("progress %+v %+v", one.Progress, two.Progress)
+	get := func(p string) store.Progress { it, _ := st.Item(ctx, ids[p]); return it.Progress }
+	if p := get("Saga/Saga 01.cbz"); p.Page != 4 || p.Status != "reading" || p.UpdatedAt != 1767323045 {
+		t.Fatalf("saga 01 %+v", p)
 	}
-	if one.Progress.UpdatedAt != 1767323045 {
-		t.Fatalf("timestamp %d", one.Progress.UpdatedAt)
+	if get("Saga/Saga 02.cbz").Status != "read" {
+		t.Fatal("saga 02 should be read")
+	}
+	// One Kavita chapter over three files, 13 pages read: Part 1 read, Part 2 on
+	// page 3, Part 10 untouched (natural order, not "Part 10" before "Part 2").
+	if p := get("Pack/Part 1.cbz"); p.Status != "read" || p.Page != 10 {
+		t.Fatalf("part 1 %+v", p)
+	}
+	if p := get("Pack/Part 2.cbz"); p.Status != "reading" || p.Page != 3 {
+		t.Fatalf("part 2 %+v", p)
+	}
+	if p := get("Pack/Part 10.cbz"); p.Status != "unread" {
+		t.Fatalf("part 10 %+v", p)
 	}
 }
