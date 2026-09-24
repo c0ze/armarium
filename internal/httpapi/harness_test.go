@@ -45,6 +45,8 @@ func newEnv(t *testing.T) *env {
 			Cover: tu.PNG(40, 60, 200), Files: map[string][]byte{"EPUB": mustRead(t, tu.WriteEPUB(t, t.TempDir(), "i.epub",
 				tu.EPUBOpts{Title: "x", Chapters: []string{"<p>1</p>"}})), "MOBI": []byte("MOBI-BYTES")}},
 		tu.CalibreBook{Title: "Mobi Only", Author: "Ann Other", Files: map[string][]byte{"MOBI": []byte("M")}},
+		tu.CalibreBook{Title: "No Cover File", Author: "Ann Other", Files: map[string][]byte{"EPUB": mustRead(t, tu.WriteEPUB(t, t.TempDir(), "n.epub",
+			tu.EPUBOpts{Title: "n", Chapters: []string{"<p>1</p>"}}))}},
 	)
 	pages := []tu.Entry{{Name: "01.png", Data: tu.PNG(8, 12, 10)}, {Name: "02.png", Data: tu.PNG(8, 12, 20)}, {Name: "03.jpg", Data: []byte("jpeg")}}
 	tu.WriteZip(t, comics, "Saga/Saga #01.cbz", pages...)

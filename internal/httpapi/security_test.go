@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"fmt"
+	"github.com/c0ze/armarium/internal/formats"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -205,10 +206,16 @@ func TestParallelLoginsAreCountedBeforeChecking(t *testing.T) {
 func TestResourceTypeNeverEchoesDeclaredType(t *testing.T) {
 	for declared, want := range map[string]string{
 		"font/woff2": "font/woff2", "application/x-font-ttf": "font/ttf", "font/x,text/html": "",
-		"image/svg+xml": "", "text/html": "", "image/png": "image/png",
+		"image/svg+xml": "", "text/html": "", "image/png": "image/png", "font/opentype": "font/otf",
 	} {
-		if got := resourceType(declared); got != want {
+		if got := resourceType(formats.ManifestItem{MediaType: declared, Href: "a/f.ttf"}); got != want {
 			t.Errorf("%q → %q, want %q", declared, got, want)
+		}
+	}
+	// A generic binary type counts only for font file names.
+	for href, want := range map[string]string{"f.OTF": "font/otf", "f.html": "", "f.svg": ""} {
+		if got := resourceType(formats.ManifestItem{MediaType: "application/octet-stream", Href: href}); got != want {
+			t.Errorf("octet-stream %q → %q, want %q", href, got, want)
 		}
 	}
 }

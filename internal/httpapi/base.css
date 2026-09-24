@@ -28,6 +28,8 @@ body {
   font: var(--armarium-font-size)/var(--armarium-line-height) Georgia, "Iowan Old Style", "Noto Serif", serif;
   overflow-wrap: break-word;
 }
+/* Vertical text (tategaki) scrolls sideways; its measure is the page height. */
+:root.vertical body { max-width: none !important; max-height: none !important; height: 100vh; box-sizing: border-box; padding: 2.5rem 2rem !important; }
 /* Text size is the reader's too: books shrink body copy (0.8em wrappers), which
    stretches the line past the measure. Headings and small print keep theirs. */
 body *:not(h1, h2, h3, h4, h5, h6, sup, sub, small) { font-size: inherit !important; }

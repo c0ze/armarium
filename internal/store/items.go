@@ -96,8 +96,8 @@ func (s *Store) Items(ctx context.Context, f ItemFilter) ([]Item, int, error) {
 		add("i.series_id = ?", f.SeriesID)
 	}
 	if f.Query != "" {
-		where = append(where, "(i.title LIKE ? ESCAPE '\\' OR s.name LIKE ? ESCAPE '\\' OR i.author LIKE ? ESCAPE '\\')")
-		args = append(args, likePattern(f.Query), likePattern(f.Query), likePattern(f.Query))
+		where = append(where, "i.search LIKE ? ESCAPE '\\'")
+		args = append(args, likePattern(f.Query))
 	}
 	if f.Status != "" {
 		add("COALESCE(p.status, 'unread') = ?", f.Status)

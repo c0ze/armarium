@@ -26,18 +26,23 @@ func CSS(src []byte, resolve func(ref string) (string, bool)) []byte {
 	})
 }
 
-// Document wraps a sanitized body fragment into a complete HTML page with the
-// book's stylesheets after the reader's base stylesheet.
-func Document(body []byte, sheets []string, base string) []byte {
+// Document wraps a sanitized chapter into a complete HTML page: the reader's base
+// stylesheet first, then the book's stylesheets and its own <style> blocks.
+func Document(p Page, base string) []byte {
 	var b bytes.Buffer
-	b.WriteString(`<!doctype html><html><head><meta charset="utf-8">`)
+	b.WriteString(`<!doctype html><html` + p.Root + `><head><meta charset="utf-8">`)
 	b.WriteString(`<meta name="viewport" content="width=device-width, initial-scale=1">`)
 	b.WriteString(`<link rel="stylesheet" href="` + html.EscapeString(base) + `">`)
-	for _, s := range sheets {
+	for _, s := range p.Sheets {
 		b.WriteString(`<link rel="stylesheet" href="` + html.EscapeString(s) + `">`)
 	}
-	b.WriteString(`</head><body>`)
-	b.Write(body)
+	for _, s := range p.Styles {
+		b.WriteString(`<style>`)
+		b.Write(s)
+		b.WriteString(`</style>`)
+	}
+	b.WriteString(`</head><body` + p.BodyAttrs + `>`)
+	b.Write(p.Body)
 	b.WriteString(`</body></html>`)
 	return b.Bytes()
 }

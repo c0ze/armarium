@@ -10,6 +10,8 @@
   let toc = $state<TocEntry[]>([]);
   let chapters = $state(0);
   let chapter = $state(0);
+  // Right-to-left books (Japanese, Arabic) turn pages the other way.
+  let rtl = $state(false);
   let showToc = $state(false);
   let error = $state('');
   let frame = $state<HTMLIFrameElement>();
@@ -26,6 +28,7 @@
         item = d.item;
         toc = t.toc;
         chapters = t.chapters;
+        rtl = t.rtl;
         const loc = parseLocator(d.item.progress.locator);
         chapter = Math.min(loc?.chapter ?? Math.max(d.item.progress.page - 1, 0), Math.max(chapters - 1, 0));
         restoreScroll = loc?.scroll ?? 0;
@@ -46,13 +49,20 @@
     const landed = chapterFromPath(win.location.pathname, id);
     if (landed !== null && landed !== chapter) chapter = landed; // followed an in-book link
     applyTheme();
+    // Vertical text (tategaki) flows right to left, so the chapter scrolls
+    // sideways: scrollX runs from 0 to minus the overflow.
+    const vertical = win.getComputedStyle(doc.body).writingMode.startsWith('vertical');
+    doc.documentElement.classList.toggle('vertical', vertical);
+    const root = doc.documentElement;
+    const span = () => (vertical ? root.scrollWidth - win.innerWidth : root.scrollHeight - win.innerHeight);
     if (restoreScroll) {
-      win.scrollTo(0, restoreScroll * (doc.documentElement.scrollHeight - win.innerHeight));
+      if (vertical) win.scrollTo(-restoreScroll * span(), 0);
+      else win.scrollTo(0, restoreScroll * span());
       restoreScroll = 0;
     }
     win.addEventListener('scroll', () => {
-      const max = doc.documentElement.scrollHeight - win.innerHeight;
-      fraction = max > 0 ? win.scrollY / max : 1;
+      const max = span();
+      fraction = max > 0 ? Math.min(Math.abs(vertical ? win.scrollX : win.scrollY) / max, 1) : 1;
       scheduleSave();
     }, { passive: true });
     doc.addEventListener('keydown', onKey);
@@ -87,8 +97,10 @@
   }
 
   function onKey(e: KeyboardEvent) {
-    if (e.key === 'ArrowRight' && e.altKey === false) go(chapter + 1);
-    if (e.key === 'ArrowLeft' && e.altKey === false) go(chapter - 1);
+    if (e.altKey) return;
+    const [next, prev] = rtl ? ['ArrowLeft', 'ArrowRight'] : ['ArrowRight', 'ArrowLeft'];
+    if (e.key === next) go(chapter + 1);
+    if (e.key === prev) go(chapter - 1);
   }
 
   onDestroy(() => { clearTimeout(saveTimer); save(); });
@@ -119,9 +131,9 @@
       <iframe bind:this={frame} {src} title="Chapter" sandbox="allow-same-origin" onload={onLoad}></iframe>
     {/if}
   </div>
-  <footer>
-    <button disabled={chapter <= 0} onclick={() => go(chapter - 1)}><Icon name="left" size={14} /> Previous</button>
-    <button disabled={chapter >= chapters - 1} onclick={() => go(chapter + 1)}>Next <Icon name="right" size={14} /></button>
+  <footer dir={rtl ? 'rtl' : 'ltr'}>
+    <button disabled={chapter <= 0} onclick={() => go(chapter - 1)}><Icon name={rtl ? 'right' : 'left'} size={14} /> Previous</button>
+    <button disabled={chapter >= chapters - 1} onclick={() => go(chapter + 1)}>Next <Icon name={rtl ? 'left' : 'right'} size={14} /></button>
   </footer>
 </div>
 

@@ -60,19 +60,26 @@ func (s *Scanner) inspect(abs, rel, format string) (pages int, title, author str
 			pages = c.Pages()
 			c.Close()
 		} else {
-			s.Log.Warn("scan: cannot open archive", "path", rel, "err", err)
+			s.failed(rel, err)
 		}
 	case "epub":
 		if e, err := formats.OpenEPUB(abs, s.Limits); err == nil {
 			pages, title, author = len(e.Spine), e.Title, e.Author
 			e.Close()
 		} else {
-			s.Log.Warn("scan: cannot open epub", "path", rel, "err", err)
+			s.failed(rel, err)
 		}
 	case "pdf":
 		pages = formats.PDFPageCount(abs)
 	}
 	return pages, title, author
+}
+
+// failed records a file that is listed but cannot be read: it stays
+// downloadable, and the scan status counts it so Admin shows it.
+func (s *Scanner) failed(rel string, err error) {
+	s.Log.Warn("scan: cannot open file", "path", rel, "err", err)
+	s.bump(func(st *Status) { st.Errors++; st.LastError = rel + ": " + err.Error() })
 }
 
 // writer funnels all scanner writes into short transactions of batchSize rows.

@@ -1,6 +1,7 @@
 package sanitize
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 )
@@ -27,8 +28,8 @@ func resolver() Options {
 
 func clean(t *testing.T, in string) string {
 	t.Helper()
-	out, _ := Chapter([]byte(in), resolver())
-	return string(out)
+	p := Chapter([]byte(in), resolver())
+	return p.Root + p.BodyAttrs + string(p.Body) + string(bytes.Join(p.Styles, nil))
 }
 
 // The payloads below come from the audit of the Python reader (2026-09-23).
@@ -59,7 +60,7 @@ func TestDropsScriptVectors(t *testing.T) {
 		out := strings.ToLower(clean(t, in))
 		for _, needle := range []string{"<script", "onerror", "onload", "onclick", "onmouseover", "javascript:",
 			"evil.example", "<svg", "<math", "<style", "<iframe", "<object", "<embed", "<form", "<input",
-			"srcset", "<base", "<meta", "<link", "style=", "<template", "<noscript"} {
+			"srcset", "<base", "<meta", "<link", "<template", "<noscript"} {
 			if strings.Contains(out, needle) {
 				t.Errorf("input %q\n  output %q\n  contains %q", in, out, needle)
 			}
@@ -104,7 +105,7 @@ func TestSVGCoverImageBecomesImg(t *testing.T) {
 }
 
 func TestStylesheetsAreCollected(t *testing.T) {
-	_, sheets := Chapter([]byte(`<head><link rel="stylesheet" href="style.css"/><link rel="stylesheet" href="https://evil.example/x.css"/></head><p>x</p>`), resolver())
+	sheets := Chapter([]byte(`<head><link rel="stylesheet" href="style.css"/><link rel="stylesheet" href="https://evil.example/x.css"/></head><p>x</p>`), resolver()).Sheets
 	if len(sheets) != 1 || sheets[0] != "/read/1/res/4" {
 		t.Fatalf("sheets = %v", sheets)
 	}
@@ -120,8 +121,8 @@ func TestCSSRewritesURLs(t *testing.T) {
 }
 
 func TestDocumentWrapsBody(t *testing.T) {
-	doc := string(Document([]byte("<p>x</p>"), []string{"/read/1/res/4"}, "/read/base.css"))
-	if !strings.HasPrefix(doc, "<!doctype html>") || !strings.Contains(doc, `<link rel="stylesheet" href="/read/1/res/4">`) ||
+	doc := string(Document(Page{Body: []byte("<p>x</p>"), Sheets: []string{"/read/1/res/4"}}, "/read/base.css"))
+	if !strings.HasPrefix(doc, "<!doctype html><html><head>") || !strings.Contains(doc, `<link rel="stylesheet" href="/read/1/res/4">`) ||
 		!strings.Contains(doc, "<body><p>x</p></body>") {
 		t.Fatalf("got %s", doc)
 	}

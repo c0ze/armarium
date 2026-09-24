@@ -88,6 +88,7 @@ export interface ScanStatus {
   updated: number;
   missing: number;
   errors: number;
+  skipped: number;
   lastError: string;
 }
 
@@ -131,7 +132,7 @@ export const api = {
   items: (f: Record<string, string | number | undefined>) => call<Page<Item>>('GET', `/api/items${query(f)}`),
   item: (id: number) => call<{ item: Item; library: Library }>('GET', `/api/items/${id}`),
   facets: (library?: number) => call<{ sources: Facet[]; tags: Facet[] }>('GET', `/api/facets${query({ library })}`),
-  toc: (id: number) => call<{ chapters: number; toc: TocEntry[] }>('GET', `/api/items/${id}/toc`),
+  toc: (id: number) => call<{ chapters: number; toc: TocEntry[]; rtl: boolean }>('GET', `/api/items/${id}/toc`),
   progress: (id: number, body: { page?: number; locator?: string; status?: Status; reset?: boolean }) =>
     call<{ progress: Progress; applied: boolean }>('PUT', `/api/items/${id}/progress`, body),
   scanStatus: () => call<ScanStatus>('GET', '/api/scan'),

@@ -90,3 +90,26 @@ func TestEPUBWithoutContainerFallsBackToOPF(t *testing.T) {
 		t.Fatalf("got %q %v", e.Title, e.Spine)
 	}
 }
+
+func TestEPUBGuessesUndeclaredCoverAndRTL(t *testing.T) {
+	// Like Calibre's own guide: a manifest image with id "cover", no <meta name="cover">.
+	p := tu.WriteZip(t, t.TempDir(), "b.epub",
+		tu.Entry{Name: "mimetype", Data: []byte("application/epub+zip")},
+		tu.Entry{Name: "META-INF/container.xml", Data: []byte(`<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>`)},
+		tu.Entry{Name: "content.opf", Data: []byte(`<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="2.0"><metadata/><manifest><item href="cover.jpg" id="cover" media-type="image/jpeg"/><item href="c.xhtml" id="c" media-type="application/xhtml+xml"/></manifest><spine page-progression-direction="rtl"><itemref idref="c"/></spine></package>`)},
+		tu.Entry{Name: "cover.jpg", Data: tu.PNG(4, 6, 9)},
+		tu.Entry{Name: "c.xhtml", Data: []byte(`<html><body><p>x</p><img src="unlisted.png"/></body></html>`)},
+		tu.Entry{Name: "unlisted.png", Data: tu.PNG(2, 2, 1)},
+	)
+	e, err := OpenEPUB(p, lim)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e.Close()
+	if e.Cover < 0 || e.Manifest[e.Cover].Href != "cover.jpg" || !e.RTL {
+		t.Fatalf("cover %d, rtl %v", e.Cover, e.RTL)
+	}
+	if i, ok := e.IndexOf("unlisted.png"); !ok || e.Manifest[i].MediaType != "image/png" {
+		t.Fatalf("unlisted image not indexed: %d %v", i, ok)
+	}
+}

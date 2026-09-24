@@ -183,7 +183,7 @@ func itemEntry(base string, it store.Item) opds.Entry {
 	updated := time.Unix(max(it.AddedAt, it.Progress.UpdatedAt), 0)
 	e := opds.Entry{
 		ID: fmt.Sprintf("urn:armarium:item:%d", it.ID), Title: it.Title, Author: it.Author, Updated: updated,
-		Content: fmt.Sprintf("%s · %s · %d pages · %.1f MB", it.SeriesName, strings.ToUpper(it.Format), it.Pages, float64(it.Size)/(1<<20)),
+		Content: entrySummary(it),
 		Links:   []opds.Link{{Rel: opds.RelAcq, Href: href + "/file", Type: formats.MediaTypeOf(it.Format)}},
 	}
 	// Other formats of a Calibre book: one acquisition link each (KOReader, Kindle).
@@ -218,4 +218,19 @@ func (s *Server) opdsPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.servePage(w, r, it, n)
+}
+
+// entrySummary is the one-line OPDS content: series, format, length, size. EPUB
+// lengths are chapters, and an unknown length is left out.
+func entrySummary(it store.Item) string {
+	parts := []string{it.SeriesName, strings.ToUpper(it.Format)}
+	unit := "pages"
+	if it.Format == "epub" {
+		unit = "chapters"
+	}
+	if it.Pages > 0 {
+		parts = append(parts, fmt.Sprintf("%d %s", it.Pages, unit))
+	}
+	parts = append(parts, fmt.Sprintf("%.1f MB", float64(it.Size)/(1<<20)))
+	return strings.Join(parts, " · ")
 }

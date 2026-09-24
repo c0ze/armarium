@@ -80,8 +80,9 @@ func (b *Batch) seriesID(ctx context.Context, path, name, sort string) (int64, e
 		return id, nil
 	}
 	var id int64
-	err := b.tx.QueryRowContext(ctx, `INSERT INTO series (library_id, path, name, sort_name) VALUES (?, ?, ?, ?)
-		ON CONFLICT (library_id, path) DO UPDATE SET name = excluded.name, sort_name = excluded.sort_name
+	err := b.tx.QueryRowContext(ctx, `INSERT INTO series (library_id, path, name, sort_name, search) VALUES (?, ?, ?, ?, fold(?3))
+		ON CONFLICT (library_id, path) DO UPDATE SET name = excluded.name, sort_name = excluded.sort_name,
+		  search = excluded.search
 		RETURNING id`, b.libraryID, path, name, sort).Scan(&id)
 	if err == nil {
 		b.series[path] = id
@@ -97,15 +98,15 @@ func (b *Batch) Upsert(ctx context.Context, it ScannedItem) error {
 	}
 	var id int64
 	err = b.tx.QueryRowContext(ctx, `INSERT INTO item (library_id, series_id, path, format, size, mtime, title,
-		  sort_title, number, pages, source, added_at, author, has_cover)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		  sort_title, number, pages, source, added_at, author, has_cover, search)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, fold(?))
 		ON CONFLICT (library_id, path) DO UPDATE SET series_id = excluded.series_id, format = excluded.format,
 		  size = excluded.size, mtime = excluded.mtime, title = excluded.title, sort_title = excluded.sort_title,
 		  number = excluded.number, pages = excluded.pages, source = excluded.source, author = excluded.author,
-		  has_cover = excluded.has_cover, missing_at = NULL
+		  has_cover = excluded.has_cover, search = excluded.search, missing_at = NULL
 		RETURNING id`,
 		b.libraryID, sid, it.Path, it.Format, it.Size, it.MTime, it.Title, it.SortTitle, it.Number, it.Pages,
-		it.Source, b.s.now(), it.Author, it.HasCover).Scan(&id)
+		it.Source, b.s.now(), it.Author, it.HasCover, it.Title+"\n"+it.Author+"\n"+it.SeriesName).Scan(&id)
 	if err != nil || !it.Calibre {
 		return err
 	}

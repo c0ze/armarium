@@ -6,10 +6,12 @@ import (
 	"encoding/xml"
 	"errors"
 	"io"
+	"maps"
 	"net/url"
 	"os"
 	"path"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -36,6 +38,7 @@ type EPUB struct {
 	Manifest []ManifestItem
 	Spine    []int // manifest indices in reading order
 	Cover    int   // manifest index of the cover image, or -1
+	RTL      bool  // spine page-progression-direction="rtl" (Japanese, Arabic, …)
 	byPath   map[string]int
 }
 
@@ -54,9 +57,12 @@ type opfDoc struct {
 		MediaType  string `xml:"media-type,attr"`
 		Properties string `xml:"properties,attr"`
 	} `xml:"manifest>item"`
-	Spine []struct {
-		IDRef string `xml:"idref,attr"`
-	} `xml:"spine>itemref"`
+	Spine struct {
+		Direction string `xml:"page-progression-direction,attr"`
+		Refs      []struct {
+			IDRef string `xml:"idref,attr"`
+		} `xml:"itemref"`
+	} `xml:"spine"`
 }
 
 func OpenEPUB(p string, lim Limits) (*EPUB, error) {
@@ -139,11 +145,37 @@ func (e *EPUB) fill(opf *opfDoc) {
 			e.Cover = idx
 		}
 	}
-	for _, ref := range opf.Spine {
+	for _, ref := range opf.Spine.Refs {
 		if idx, ok := ids[ref.IDRef]; ok && e.files[e.Manifest[idx].Href] != nil {
 			e.Spine = append(e.Spine, idx)
 		}
 	}
+	e.RTL = opf.Spine.Direction == "rtl"
+	if e.Cover < 0 { // undeclared cover: an image named like one, as Calibre guesses
+		for i, m := range e.Manifest {
+			if strings.HasPrefix(m.MediaType, "image/") &&
+				(strings.Contains(strings.ToLower(m.ID), "cover") || strings.Contains(strings.ToLower(path.Base(m.Href)), "cover")) {
+				e.Cover = i
+				break
+			}
+		}
+	}
+	// Books reference images they forgot to list in the manifest; readers show
+	// them anyway, so such files join the manifest with a type from their name.
+	// Sorted, so their indices (which end up in cached URLs) never change.
+	for _, name := range slices.Sorted(maps.Keys(e.files)) {
+		if _, listed := e.byPath[name]; !listed {
+			if t := unlistedTypes[strings.ToLower(path.Ext(name))]; t != "" {
+				e.byPath[name] = len(e.Manifest)
+				e.Manifest = append(e.Manifest, ManifestItem{Href: name, MediaType: t})
+			}
+		}
+	}
+}
+
+var unlistedTypes = map[string]string{
+	".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".gif": "image/gif", ".webp": "image/webp",
+	".css": "text/css", ".ttf": "font/ttf", ".otf": "font/otf", ".woff": "font/woff", ".woff2": "font/woff2",
 }
 
 func hasProp(props, want string) bool {

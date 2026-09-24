@@ -85,6 +85,7 @@
       <p class="scan" class:live={status.running}>
         {#if status.running}<span class="pulse" aria-hidden="true"></span>Scanning now{:else}Last scan {when(status.finishedAt)}{/if}
         <span>{status.added.toLocaleString()} added</span><span>{status.updated.toLocaleString()} updated</span><span>{status.missing.toLocaleString()} missing</span>
+        {#if status.skipped}<span title="Calibre lists these books but no usable file is on disk">{status.skipped} without a file</span>{/if}
         {#if status.errors}<span class="error">{status.errors} failed: {status.lastError}</span>{/if}
       </p>
     {/if}

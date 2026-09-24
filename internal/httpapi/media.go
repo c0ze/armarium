@@ -126,21 +126,8 @@ func (s *Server) serveCover(w http.ResponseWriter, r *http.Request, it store.Ite
 		s.fail(w, r, errNotFound)
 		return
 	}
-	switch {
-	case s.calibreLibrary(ctx, it.LibraryID):
-		// Calibre keeps the cover it chose (or the user set) next to the files.
-		src = func() (io.ReadCloser, error) {
-			p, err := s.filePath(ctx, it)
-			if err != nil {
-				return nil, err
-			}
-			f, err := os.Open(filepath.Join(filepath.Dir(p), "cover.jpg"))
-			if err != nil {
-				return nil, covers.ErrNoCover
-			}
-			return f, nil
-		}
-	case it.Format == "cbz" || it.Format == "cbr":
+	switch it.Format {
+	case "cbz", "cbr":
 		src = func() (io.ReadCloser, error) {
 			c, done, err := s.openComic(ctx, it)
 			if err != nil {
@@ -149,7 +136,7 @@ func (s *Server) serveCover(w http.ResponseWriter, r *http.Request, it store.Ite
 			rc, _, err := c.Page(0)
 			return releasing(rc, done, err)
 		}
-	case it.Format == "epub":
+	case "epub":
 		src = func() (io.ReadCloser, error) {
 			e, done, err := s.openEPUB(ctx, it)
 			if err != nil {
@@ -162,7 +149,26 @@ func (s *Server) serveCover(w http.ResponseWriter, r *http.Request, it store.Ite
 			rc, err := e.Entry(e.Cover)
 			return releasing(rc, done, err)
 		}
-	default:
+	}
+	if s.calibreLibrary(ctx, it.LibraryID) {
+		// Calibre keeps the cover it chose (or the user set) next to the files;
+		// many books have none there, so the file's own cover is the fallback.
+		embedded := src
+		src = func() (io.ReadCloser, error) {
+			p, err := s.filePath(ctx, it)
+			if err != nil {
+				return nil, err
+			}
+			if f, err := os.Open(filepath.Join(filepath.Dir(p), "cover.jpg")); err == nil {
+				return f, nil
+			}
+			if embedded == nil {
+				return nil, covers.ErrNoCover
+			}
+			return embedded()
+		}
+	}
+	if src == nil {
 		s.fail(w, r, errNotFound)
 		return
 	}
@@ -214,7 +220,7 @@ func (s *Server) getFile(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if f := r.URL.Query().Get("format"); f != "" && f != it.Format {
+	if f := strings.ToLower(r.URL.Query().Get("format")); f != "" && f != it.Format {
 		p, err := s.Store.ItemFile(r.Context(), it.ID, f)
 		if err != nil {
 			s.fail(w, r, err)

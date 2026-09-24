@@ -23,6 +23,10 @@ func TestCalibreBooksServeFormatsCoversAndOPDS(t *testing.T) {
 	if w := e.do(req{path: fmt.Sprintf("/api/items/%d/cover", inf.ID), token: e.token}); w.Code != 200 || w.Header().Get("Content-Type") != "image/jpeg" {
 		t.Fatalf("calibre cover: %d", w.Code)
 	}
+	// Without a cover.jpg, an EPUB's own cover stands in.
+	if w := e.do(req{path: fmt.Sprintf("/api/items/%d/cover", e.items["No Cover File"].ID), token: e.token}); w.Code != 200 {
+		t.Fatalf("embedded cover fallback: %d", w.Code)
+	}
 	if w := e.do(req{path: fmt.Sprintf("/api/items/%d/cover", mobi.ID), token: e.token}); w.Code != 404 {
 		t.Fatalf("book without cover: %d", w.Code)
 	}

@@ -32,6 +32,7 @@ type Status struct {
 	Updated    int    `json:"updated"`
 	Missing    int    `json:"missing"`
 	Errors     int    `json:"errors"`
+	Skipped    int    `json:"skipped"` // Calibre books with no usable file on disk
 	LastError  string `json:"lastError"`
 }
 
@@ -87,7 +88,8 @@ func (s *Scanner) Run(ctx context.Context, only string) error {
 	}
 	s.bump(func(st *Status) { st.Running = false; st.FinishedAt = time.Now().Unix() })
 	st := s.Status()
-	s.Log.Info("scan finished", "added", st.Added, "updated", st.Updated, "missing", st.Missing, "errors", st.Errors)
+	s.Log.Info("scan finished", "added", st.Added, "updated", st.Updated, "missing", st.Missing,
+		"errors", st.Errors, "skipped", st.Skipped)
 	return firstErr
 }
 
@@ -161,7 +163,8 @@ func (s *Scanner) library(ctx context.Context, lib store.Library) error {
 		k, ok := known[f.rel]
 		// A readable file stuck at 0 pages failed to open last time; retry it so
 		// reader fixes (misnamed archives, odd EPUBs) reach existing entries.
-		retry := k.Pages == 0 && retryable(f.rel)
+		// Empty files are never retried: nothing can make them open.
+		retry := k.Pages == 0 && f.size > 0 && retryable(f.rel)
 		if ok && k.Size == f.size && k.MTime == f.mt && !retry {
 			if f.meta != nil { // Calibre metadata can change while the file does not
 				it := *f.meta

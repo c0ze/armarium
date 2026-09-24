@@ -30,8 +30,8 @@ func (s *Scanner) calibreFiles(ctx context.Context, realRoot string, visit func(
 		for _, f := range b.Files {
 			abs := filepath.Join(realRoot, filepath.FromSlash(f.Path))
 			info, err := os.Stat(abs)
-			if err != nil || !info.Mode().IsRegular() || !insideRoot(realRoot, abs) {
-				continue
+			if err != nil || !info.Mode().IsRegular() || info.Size() == 0 || !insideRoot(realRoot, abs) {
+				continue // missing, empty (a failed download) or outside the library
 			}
 			if primary == nil {
 				primary = &found{rel: f.Path, size: info.Size(), mt: info.ModTime().Unix(), abs: abs}
@@ -40,7 +40,10 @@ func (s *Scanner) calibreFiles(ctx context.Context, realRoot string, visit func(
 			extra = append(extra, store.ExtraFile{Format: f.Format, Path: f.Path, Size: info.Size()})
 		}
 		if primary == nil {
-			continue // no file on disk: the book's item (if any) is marked missing
+			// No usable file: the book's item (if any) is marked missing.
+			s.Log.Warn("scan: calibre book has no usable file", "id", b.ID, "title", b.Title, "formats", len(b.Files))
+			s.bump(func(st *Status) { st.Skipped++ })
+			continue
 		}
 		primary.meta = calibreItem(b, *primary, extra)
 		visit(*primary)

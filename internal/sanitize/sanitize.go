@@ -19,9 +19,11 @@ type Options struct {
 	Link     func(ref string) (string, bool) // links to other chapters
 }
 
-// Elements dropped together with everything inside them.
+// Elements dropped together with everything inside them. <head> is not one of
+// them: its <link> and <style> are collected, <title> and <script> are dropped
+// here, and <meta>/<base> are not on the allowlist.
 var dropped = set("script", "style", "svg", "math", "iframe", "object", "embed", "form", "template",
-	"noscript", "head", "title", "button", "input", "select", "textarea", "audio", "video", "canvas",
+	"noscript", "title", "button", "input", "select", "textarea", "audio", "video", "canvas",
 	"applet", "frame", "frameset", "noembed", "noframes", "xmp", "plaintext", "portal", "dialog")
 
 var allowed = set("a", "abbr", "address", "article", "aside", "b", "bdi", "bdo", "big", "blockquote", "br",
@@ -50,18 +52,26 @@ var tagAttrs = map[string]map[string]bool{
 	"time":     set("datetime"),
 }
 
-// Chapter sanitizes one XHTML document and returns the body fragment plus the
-// served URLs of its same-book stylesheets.
-func Chapter(src []byte, o Options) ([]byte, []string) {
-	src = selfClosingRaw.ReplaceAll(src, []byte("<$1$2></$1>"))
+// Page is a sanitized chapter, ready for Document.
+type Page struct {
+	Body            []byte
+	Sheets          []string // served URLs of same-book stylesheets
+	Styles          [][]byte // the chapter's own <style> blocks, url()s rewritten
+	Root, BodyAttrs string   // class/lang/dir of <html> and <body>, written out
+}
+
+// Chapter sanitizes one XHTML document.
+func Chapter(src []byte, o Options) Page {
+	src = selfClosingRaw.ReplaceAll(toUTF8(src), []byte("<$1$2></$1>"))
 	z := xhtml.NewTokenizer(bytes.NewReader(src))
 	var out bytes.Buffer
-	var sheets []string
+	var p Page
 	skip := 0 // depth inside a dropped element
 	for {
 		tt := z.Next()
 		if tt == xhtml.ErrorToken {
-			return out.Bytes(), sheets
+			p.Body = out.Bytes()
+			return p
 		}
 		tok := z.Token()
 		name := tok.Data
@@ -69,9 +79,30 @@ func Chapter(src []byte, o Options) ([]byte, []string) {
 		case xhtml.StartTagToken, xhtml.SelfClosingTagToken:
 			if name == "link" && strings.EqualFold(attr(tok, "rel"), "stylesheet") {
 				if u, ok := o.Resource(attr(tok, "href")); ok {
-					sheets = append(sheets, u)
+					p.Sheets = append(p.Sheets, u)
 				}
 				continue
+			}
+			// Vertical Japanese and similar layouts hang off classes on <html> or
+			// <body> (html.vrtl { writing-mode: vertical-rl }), so those survive.
+			if skip == 0 && (name == "html" || name == "body") {
+				var b bytes.Buffer
+				writeGlobalAttrs(&b, tok, o)
+				if name == "html" {
+					p.Root = b.String()
+				} else {
+					p.BodyAttrs = b.String()
+				}
+				continue
+			}
+			// A book's own <style> carries real formatting (Sigil's p.sgc-1 {bold});
+			// it is raw text, so the next token is its whole content.
+			if skip == 0 && name == "style" && tt == xhtml.StartTagToken {
+				if z.Next() == xhtml.TextToken {
+					p.Styles = append(p.Styles, safeCSS(z.Text(), o))
+					skip++ // the end tag comes next and pops this
+				}
+				continue // an empty <style></style> already consumed its end tag
 			}
 			if skip > 0 || dropped[name] {
 				if skip > 0 && name == "image" { // SVG-wrapped cover pages
@@ -129,16 +160,37 @@ func writeStart(out *bytes.Buffer, tok xhtml.Token, o Options) {
 			writeAttr(out, "href", u)
 		}
 	}
+	writeGlobalAttrs(out, tok, o)
+	for _, a := range tok.Attr {
+		if tagAttrs[name][a.Key] {
+			writeAttr(out, a.Key, a.Val)
+		}
+	}
+	out.WriteString(">")
+}
+
+// writeGlobalAttrs keeps id, class, title, lang and dir, plus a style attribute
+// with its url()s pinned to the book (code listings rely on inline
+// white-space: pre and a monospace font).
+func writeGlobalAttrs(out *bytes.Buffer, tok xhtml.Token, o Options) {
 	for _, a := range tok.Attr {
 		key := a.Key
 		if key == "xml:lang" {
 			key = "lang"
 		}
-		if globalAttrs[key] || tagAttrs[name][key] {
+		switch {
+		case globalAttrs[key]:
 			writeAttr(out, key, a.Val)
+		case key == "style":
+			writeAttr(out, key, string(CSS([]byte(a.Val), o.Resource)))
 		}
 	}
-	out.WriteString(">")
+}
+
+// safeCSS rewrites a <style> block's url()s and makes sure it cannot close its
+// own element when written back out.
+func safeCSS(src []byte, o Options) []byte {
+	return bytes.ReplaceAll(CSS(src, o.Resource), []byte("</"), []byte(`<\/`))
 }
 
 func writeSVGImage(out *bytes.Buffer, tok xhtml.Token, o Options) {

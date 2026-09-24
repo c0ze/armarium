@@ -61,7 +61,9 @@
       </div>
 
       <div class="actions">
-        {#if item.format === 'epub'}
+        {#if item.format !== 'pdf' && readable(item.format) && !item.pages}
+          <p class="muted broken">This file could not be opened; it can still be downloaded.</p>
+        {:else if item.format === 'epub'}
           <a class="button primary" href="/reader/{item.id}" use:link><Icon name="play" size={14} /> {item.progress.page ? 'Resume' : 'Read'}</a>
         {:else if item.format === 'pdf'}
           <a class="button primary" href={fileUrl(item.id, true)} target="_blank" rel="noopener"><Icon name="play" size={14} /> Open PDF</a>
@@ -92,6 +94,7 @@
 {/if}
 
 <style>
+  .broken { margin: 0; font-size: 14px; }
   .item { display: grid; grid-template-columns: clamp(12rem, 24vw, 20rem) minmax(0, 1fr); gap: clamp(2rem, 4vw, 4rem); padding: 3rem 0 4rem; align-items: start; }
   .art:has(:global(.plate)) { aspect-ratio: 2 / 3; }
   .art { border-radius: 4px; overflow: hidden; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.5); }

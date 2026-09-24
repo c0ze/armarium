@@ -81,3 +81,24 @@ func TestFolderScanListsDownloadOnlyFormats(t *testing.T) {
 		t.Fatalf("items %+v", items)
 	}
 }
+
+func TestCalibreSkipsEmptyFilesAndReportsBrokenOnes(t *testing.T) {
+	root := t.TempDir()
+	tu.WriteCalibre(t, root,
+		tu.CalibreBook{Title: "Empty Epub", Author: "A", Files: map[string][]byte{"EPUB": {}, "PDF": []byte("%PDF-1.4")}},
+		tu.CalibreBook{Title: "Only Empty", Author: "A", Files: map[string][]byte{"EPUB": {}}},
+		tu.CalibreBook{Title: "Broken", Author: "A", Files: map[string][]byte{"EPUB": []byte("not a zip")}},
+	)
+	sc, st := newScanner(t, config.Library{Name: "Calibre", Root: root, Kind: "books", Calibre: true})
+	ctx := context.Background()
+	if err := sc.Run(ctx, ""); err != nil {
+		t.Fatal(err)
+	}
+	if s := sc.Status(); s.Skipped != 1 || s.Errors != 1 {
+		t.Fatalf("status %+v, want 1 skipped (Only Empty) and 1 error (Broken)", s)
+	}
+	items, _, _ := st.Items(ctx, store.ItemFilter{Sort: "title", Limit: 10})
+	if len(items) != 2 || items[1].Title != "Empty Epub" || items[1].Format != "pdf" {
+		t.Fatalf("empty EPUB should fall back to the PDF: %+v", items)
+	}
+}

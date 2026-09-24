@@ -94,7 +94,7 @@ func (s *Store) SeriesList(ctx context.Context, libraryID int64, q string, offse
 	where := `s.library_id = ? AND EXISTS (SELECT 1 FROM item i WHERE i.series_id = s.id AND i.missing_at IS NULL)`
 	args := []any{libraryID}
 	if q != "" {
-		where += " AND s.name LIKE ? ESCAPE '\\'"
+		where += " AND s.search LIKE ? ESCAPE '\\'"
 		args = append(args, likePattern(q))
 	}
 	var total int
@@ -125,7 +125,7 @@ func (s *Store) Series(ctx context.Context, id int64) (Series, error) {
 
 func likePattern(q string) string {
 	r := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
-	return "%" + r.Replace(q) + "%"
+	return "%" + r.Replace(fold(q)) + "%"
 }
 
 func notFound(err error) error {

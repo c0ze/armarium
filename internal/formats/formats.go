@@ -81,8 +81,19 @@ var mediaTypes = map[string]string{
 	"azw":  "application/vnd.amazon.ebook",
 	"fb2":  "application/x-fictionbook+xml",
 	"djvu": "image/vnd.djvu",
-	"txt":  "text/plain; charset=utf-8",
+	"txt":  "text/plain",
 	"rtf":  "application/rtf",
+}
+
+// otherTypes are formats Calibre libraries carry that a folder scan must not
+// pick up (every .zip or .html would become a book). HTML stays a generic
+// binary on purpose: book HTML must never render on Armarium's origin.
+var otherTypes = map[string]string{
+	"zip": "application/zip", "rar": "application/vnd.rar", "prc": "application/x-mobipocket-ebook",
+	"pdb": "application/vnd.palm", "lit": "application/x-ms-reader", "chm": "application/vnd.ms-htmlhelp",
+	"docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "doc": "application/msword",
+	"odt": "application/vnd.oasis.opendocument.text", "original_epub": "application/epub+zip",
+	"kepub": "application/kepub+zip", "cb7": "application/x-cb7", "lrf": "application/x-sony-bbeb",
 }
 
 // FormatOf maps a file name found by a folder scan to a format, or "". Loose
@@ -107,6 +118,9 @@ func Readable(format string) bool {
 // MediaTypeOf returns the media type of a whole file in the given format.
 func MediaTypeOf(format string) string {
 	if t, ok := mediaTypes[format]; ok {
+		return t
+	}
+	if t, ok := otherTypes[format]; ok {
 		return t
 	}
 	return "application/octet-stream"
