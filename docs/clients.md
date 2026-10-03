@@ -27,14 +27,20 @@ test suite (valid Atom, link order, PSE attributes, token prefixes).
 
 Admin → **Pair a phone** shows a QR code that opens Skrivist Comics
 (comics.skriv.ist) or Skrivist Books (books.skriv.ist) on a phone with this
-library's OPDS catalogue filled in; tap Connect and it's done. Each pairing creates
-its own token, named like `books-phone-2026-10-04-1532`.
+library's OPDS catalogue filled in; tap Connect and it's done. Pick the device
+(iPhone, Android, iPad or your own name) first: each pairing creates its own token,
+named like `books-iphone-2026-10-04-1532`, so you can tell devices apart and revoke
+one without the others.
 
 - Set `public_url` to the HTTPS address phones use, e.g.
   `https://armarium.example.com`. Its host must be in `allowed_hosts`. The hosted
   readers refuse plain-HTTP catalogues, so Admin won't pair over HTTP.
 - Add the reader origins to `cors_origins` (`https://comics.skriv.ist`,
   `https://books.skriv.ist`): the readers fetch the catalogue from the browser.
+- The phone itself must reach `public_url`. If Armarium is only on your home network
+  or a VPN such as Tailscale, the phone has to be on it too, and its DNS has to give
+  an address the phone can reach. A QR that opens the reader but then spins on
+  Connect almost always means the phone can't reach the server.
 - The QR carries the token in the link's fragment, which never reaches the reader's
   server. Once paired, OPDS requests carry it in the path, as any token-in-path client
   does, so a reverse proxy's access log will contain it.

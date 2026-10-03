@@ -73,6 +73,18 @@ phone's camera. Admin warns when `public_url` is missing, points at this compute
 or a reader's origin is missing from `cors_origins`, and refuses to pair over plain
 HTTP. More in [clients.md](clients.md#pairing-a-phone).
 
+## Forgot the owner password?
+
+Armarium keeps only an argon2id hash of it, so it can't be recovered, only replaced:
+
+```bash
+docker exec -i armarium /armarium hash-password      # type the new password, press Enter
+```
+
+Paste the printed hash into `password_hash` in `armarium.toml` and restart the
+container (`docker compose restart`). Without Docker, run `armarium hash-password`
+instead. API tokens are unaffected.
+
 ## Binary and systemd
 
 Download the binary for your platform from the GitHub release, or build it
