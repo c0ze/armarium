@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import qrcode from 'qrcode-generator';
 import { ApiError, type Token } from './api';
-import { createPairToken, isLoopback, pairLink, pairTokenName, qrPath } from './pair';
+import { createPairToken, deviceSlug, isLoopback, pairLink, pairTokenName, qrPath } from './pair';
 
 const secret = 'Ab-_' + 'x'.repeat(39);
 
@@ -17,9 +17,34 @@ describe('pairLink', () => {
 });
 
 describe('pairTokenName', () => {
-  it('uses zero-padded local 24-hour time', () => {
-    expect(pairTokenName('comics', new Date(2026, 0, 5, 9, 7))).toBe('comics-phone-2026-01-05-0907');
-    expect(pairTokenName('books', new Date(2026, 9, 4, 15, 32))).toBe('books-phone-2026-10-04-1532');
+  it('names the reader and the device, with zero-padded local 24-hour time', () => {
+    expect(pairTokenName('comics', 'phone', new Date(2026, 0, 5, 9, 7))).toBe('comics-phone-2026-01-05-0907');
+    expect(pairTokenName('books', 'iphone', new Date(2026, 9, 4, 15, 32))).toBe('books-iphone-2026-10-04-1532');
+  });
+
+  it('stays within the 64-character token name limit, retry suffix included', () => {
+    const name = pairTokenName('comics', deviceSlug('x'.repeat(200)), new Date(2026, 9, 4, 15, 32));
+    expect((name + '-2').length).toBeLessThanOrEqual(64);
+  });
+});
+
+describe('deviceSlug', () => {
+  it('turns a device label into a token-name part', () => {
+    expect(deviceSlug('iPhone')).toBe('iphone');
+    expect(deviceSlug("  Arda's Pixel 8 Pro! ")).toBe('arda-s-pixel-8-pro');
+    expect(deviceSlug('Galaxy Tab S9')).toBe('galaxy-tab-s9');
+  });
+
+  it('falls back to phone when nothing usable is left', () => {
+    expect(deviceSlug('')).toBe('phone');
+    expect(deviceSlug('  !!  ')).toBe('phone');
+    expect(deviceSlug('日本語')).toBe('phone');
+  });
+
+  it('cuts long names without leaving a trailing dash', () => {
+    const s = deviceSlug('a'.repeat(30) + ' ' + 'b'.repeat(30));
+    expect(s.length).toBeLessThanOrEqual(32);
+    expect(s.endsWith('-')).toBe(false);
   });
 });
 
@@ -58,16 +83,16 @@ describe('createPairToken', () => {
   const now = new Date(2026, 9, 4, 15, 32);
   const made = (name: string) => ({ token: { id: 1, name, createdAt: 0, lastUsedAt: null } as Token, secret: 's' });
 
-  it('names the token after the reader and the minute', async () => {
+  it('names the token after the reader, the device and the minute', async () => {
     const create = vi.fn(async (name: string) => made(name));
-    await createPairToken('comics', now, create);
-    expect(create.mock.calls).toEqual([['comics-phone-2026-10-04-1532']]);
+    await createPairToken('comics', 'android', now, create);
+    expect(create.mock.calls).toEqual([['comics-android-2026-10-04-1532']]);
   });
 
   it('retries once with -2 when the name is taken', async () => {
     const create = vi.fn(async (name: string) => made(name));
     create.mockRejectedValueOnce(new ApiError(409, 'a token with that name exists'));
-    const r = await createPairToken('comics', now, create);
+    const r = await createPairToken('comics', 'phone', now, create);
     expect(create.mock.calls).toEqual([['comics-phone-2026-10-04-1532'], ['comics-phone-2026-10-04-1532-2']]);
     expect(r.token.name).toBe('comics-phone-2026-10-04-1532-2');
   });
@@ -76,7 +101,7 @@ describe('createPairToken', () => {
     const create = vi.fn(async (_: string) => {
       throw new ApiError(409, 'a token with that name exists');
     });
-    await expect(createPairToken('comics', now, create)).rejects.toThrow('exists');
+    await expect(createPairToken('comics', 'phone', now, create)).rejects.toThrow('exists');
     expect(create).toHaveBeenCalledTimes(2);
   });
 
@@ -84,7 +109,7 @@ describe('createPairToken', () => {
     const create = vi.fn(async (_: string) => {
       throw new ApiError(500, 'x');
     });
-    await expect(createPairToken('comics', now, create)).rejects.toThrow('x');
+    await expect(createPairToken('comics', 'phone', now, create)).rejects.toThrow('x');
     expect(create).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,16 +1,37 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api, type PairInfo, type PairReader } from '../lib/api';
-  import { createPairToken, isLoopback, pairLink, qrPath } from '../lib/pair';
+  import { createPairToken, deviceSlug, isLoopback, pairLink, qrPath } from '../lib/pair';
 
   let { onchange }: { onchange: () => void | Promise<void> } = $props();
 
-  type Pairing = { reader: PairReader; name: string; link: string; qr: { size: number; d: string } | null; qrError: string };
+  type Pairing = { reader: PairReader; device: string; name: string; link: string; qr: { size: number; d: string } | null; qrError: string };
 
   let info = $state<PairInfo | null>(null);
   let pairing = $state<Pairing | null>(null);
   let busy = $state(false);
   let error = $state('');
+
+  // Which device is being paired names its token (books-iphone-…), so the token list
+  // tells devices apart. The last choice is remembered in this browser.
+  const DEVICES = ['iPhone', 'Android', 'iPad', 'Other'];
+  const saved = (() => {
+    try {
+      return JSON.parse(localStorage.getItem('armarium.pairDevice') || '{}') as { device?: string; other?: string };
+    } catch {
+      return {};
+    }
+  })();
+  let device = $state(DEVICES.includes(saved.device ?? '') ? saved.device! : 'iPhone');
+  let other = $state(saved.other ?? '');
+  const deviceLabel = $derived(device === 'Other' ? other.trim() : device);
+  $effect(() => {
+    try {
+      localStorage.setItem('armarium.pairDevice', JSON.stringify({ device, other }));
+    } catch {
+      // Private mode or blocked storage: just don't remember it.
+    }
+  });
 
   // Without public_url the QR points at the address this page was loaded from.
   const base = $derived(info?.publicUrl || location.origin);
@@ -25,7 +46,7 @@
     pairing = null; // never leave the previous phone's QR up if this attempt fails
     busy = true;
     try {
-      const { token, secret } = await createPairToken(reader.id, new Date(), api.createToken);
+      const { token, secret } = await createPairToken(reader.id, deviceSlug(deviceLabel), new Date(), api.createToken);
       const link = pairLink(reader.url, base, secret);
       let qr: Pairing['qr'] = null;
       let qrError = '';
@@ -34,7 +55,7 @@
       } catch (e) {
         qrError = (e as Error).message;
       }
-      pairing = { reader, name: token.name, link, qr, qrError };
+      pairing = { reader, device: deviceLabel || 'phone', name: token.name, link, qr, qrError };
       await onchange();
     } catch (e) {
       error = (e as Error).message;
@@ -61,6 +82,17 @@
         <p class="warn"><code>{base}</code> is this computer's loopback address; a phone can't reach it.</p>
       {/if}
     {/if}
+    <div class="device">
+      <label>
+        <span class="caps">Device</span>
+        <select bind:value={device} disabled={plainHttp || busy}>
+          {#each DEVICES as d (d)}<option value={d}>{d}</option>{/each}
+        </select>
+      </label>
+      {#if device === 'Other'}
+        <input bind:value={other} maxlength="40" placeholder="Name it, e.g. Pixel 8" aria-label="Device name" disabled={plainHttp || busy} />
+      {/if}
+    </div>
     <div class="readers">
       {#each info.readers as r (r.id)}
         <button disabled={plainHttp || busy} onclick={() => pair(r)}>{r.name}</button>
@@ -91,7 +123,7 @@
         <p class="error">Couldn't draw the QR code: {pairing.qrError}</p>
       {/if}
       <div class="details">
-        <p>Scan with the phone's camera, then tap Connect in {pairing.reader.name}.</p>
+        <p>Scan with the {pairing.device}'s camera, then tap Connect in {pairing.reader.name}.</p>
         <p class="muted small">Token <strong>{pairing.name}</strong>. Revoke it under API tokens to unpair.</p>
         <code>{pairing.link}</code>
         <button onclick={() => (pairing = null)}>Done</button>
@@ -105,6 +137,9 @@
   .bar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
   h2 { font-size: 2rem; }
   .note { margin: 0.5rem 0 1.2rem; font-size: 14px; }
+  .device { display: flex; flex-wrap: wrap; align-items: end; gap: 0.7rem; margin-bottom: 0.9rem; }
+  .device label { display: grid; gap: 0.3rem; }
+  .device input { min-width: 14rem; }
   .readers { display: flex; flex-wrap: wrap; gap: 0.7rem; margin-bottom: 1rem; }
   .warn { margin: 0 0 0.8rem; font-size: 14px; color: var(--amber); }
   .warn.block { color: var(--danger); }

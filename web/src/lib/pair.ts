@@ -13,16 +13,27 @@ export function pairLink(readerUrl: string, base: string, secret: string): strin
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
-/** A token name per pairing, e.g. comics-phone-2026-10-04-1532 (local time). */
-export function pairTokenName(id: string, d: Date): string {
-  return `${id}-phone-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
+/** A device label ("iPhone", "Arda's Pixel") as a token-name part: iphone, arda-s-pixel. */
+export function deviceSlug(label: string): string {
+  const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return slug.slice(0, 32).replace(/-+$/, '') || 'phone';
+}
+
+/** A token name per pairing, e.g. books-iphone-2026-10-04-1532 (local time). */
+export function pairTokenName(id: string, device: string, d: Date): string {
+  return `${id}-${device}-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
 }
 
 type Created = { token: Token; secret: string };
 
 /** Creates the pairing token; a name already taken this minute gets -2. */
-export async function createPairToken(id: string, now: Date, create: (name: string) => Promise<Created>): Promise<Created> {
-  const name = pairTokenName(id, now);
+export async function createPairToken(
+  id: string,
+  device: string,
+  now: Date,
+  create: (name: string) => Promise<Created>,
+): Promise<Created> {
+  const name = pairTokenName(id, device, now);
   try {
     return await create(name);
   } catch (err) {
