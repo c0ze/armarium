@@ -19,6 +19,23 @@ export function deviceSlug(label: string): string {
   return slug.slice(0, 32).replace(/-+$/, '') || 'phone';
 }
 
+export const DEVICES = ['iPhone', 'Android', 'iPad', 'Other'];
+
+/** The device choice Admin remembers in localStorage; anything unexpected falls back to iPhone. */
+export function readDeviceChoice(raw: string | null): { device: string; other: string } {
+  let v: unknown;
+  try {
+    v = JSON.parse(raw || '{}');
+  } catch {
+    v = {};
+  }
+  const o = (v && typeof v === 'object' ? v : {}) as { device?: unknown; other?: unknown };
+  return {
+    device: typeof o.device === 'string' && DEVICES.includes(o.device) ? o.device : 'iPhone',
+    other: typeof o.other === 'string' ? o.other.slice(0, 40) : '',
+  };
+}
+
 /** A token name per pairing, e.g. books-iphone-2026-10-04-1532 (local time). */
 export function pairTokenName(id: string, device: string, d: Date): string {
   return `${id}-${device}-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api, type PairInfo, type PairReader } from '../lib/api';
-  import { createPairToken, deviceSlug, isLoopback, pairLink, qrPath } from '../lib/pair';
+  import { DEVICES, createPairToken, deviceSlug, isLoopback, pairLink, qrPath, readDeviceChoice } from '../lib/pair';
 
   let { onchange }: { onchange: () => void | Promise<void> } = $props();
 
@@ -14,16 +14,17 @@
 
   // Which device is being paired names its token (books-iphone-…), so the token list
   // tells devices apart. The last choice is remembered in this browser.
-  const DEVICES = ['iPhone', 'Android', 'iPad', 'Other'];
-  const saved = (() => {
-    try {
-      return JSON.parse(localStorage.getItem('armarium.pairDevice') || '{}') as { device?: string; other?: string };
-    } catch {
-      return {};
-    }
-  })();
-  let device = $state(DEVICES.includes(saved.device ?? '') ? saved.device! : 'iPhone');
-  let other = $state(saved.other ?? '');
+  const saved = readDeviceChoice(
+    (() => {
+      try {
+        return localStorage.getItem('armarium.pairDevice');
+      } catch {
+        return null;
+      }
+    })(),
+  );
+  let device = $state(saved.device);
+  let other = $state(saved.other);
   const deviceLabel = $derived(device === 'Other' ? other.trim() : device);
   $effect(() => {
     try {

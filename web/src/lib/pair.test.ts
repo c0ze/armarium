@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import qrcode from 'qrcode-generator';
 import { ApiError, type Token } from './api';
-import { createPairToken, deviceSlug, isLoopback, pairLink, pairTokenName, qrPath } from './pair';
+import { createPairToken, deviceSlug, isLoopback, pairLink, pairTokenName, qrPath, readDeviceChoice } from './pair';
 
 const secret = 'Ab-_' + 'x'.repeat(39);
 
@@ -111,5 +111,22 @@ describe('createPairToken', () => {
     });
     await expect(createPairToken('comics', 'phone', now, create)).rejects.toThrow('x');
     expect(create).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('readDeviceChoice', () => {
+  it('restores a saved choice', () => {
+    expect(readDeviceChoice('{"device":"Other","other":"Pixel 8"}')).toEqual({ device: 'Other', other: 'Pixel 8' });
+    expect(readDeviceChoice('{"device":"iPad"}')).toEqual({ device: 'iPad', other: '' });
+  });
+
+  it('falls back to iPhone for anything missing or malformed', () => {
+    for (const raw of [null, '', 'not json', 'null', '42', '[]', '{"device":"Toaster"}', '{"device":7,"other":42}']) {
+      const c = readDeviceChoice(raw);
+      expect(['iPhone', 'Other', 'iPad', 'Android']).toContain(c.device);
+      expect(typeof c.other).toBe('string');
+    }
+    expect(readDeviceChoice('null')).toEqual({ device: 'iPhone', other: '' });
+    expect(readDeviceChoice('{"device":"Other","other":42}')).toEqual({ device: 'Other', other: '' });
   });
 });
