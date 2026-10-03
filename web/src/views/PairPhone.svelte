@@ -123,7 +123,7 @@
         <p class="error">Couldn't draw the QR code: {pairing.qrError}</p>
       {/if}
       <div class="details">
-        <p>Scan with the {pairing.device}'s camera, then tap Connect in {pairing.reader.name}.</p>
+        <p>Open the camera on {pairing.device}, scan this, then tap Connect in {pairing.reader.name}.</p>
         <p class="muted small">Token <strong>{pairing.name}</strong>. Revoke it under API tokens to unpair.</p>
         <code>{pairing.link}</code>
         <button onclick={() => (pairing = null)}>Done</button>
