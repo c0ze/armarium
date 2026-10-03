@@ -71,6 +71,10 @@ func TestHostAllowlist(t *testing.T) {
 	if w := e.do(req{path: "/api/libraries", token: e.token, host: "localhost:8580"}); w.Code != 200 {
 		t.Fatalf("allowed host with port: %d", w.Code)
 	}
+	e.srv.Cfg.AllowedHosts = append(e.srv.Cfg.AllowedHosts, "[::1]")
+	if w := e.do(req{path: "/api/libraries", token: e.token, host: "[::1]:8580"}); w.Code != 200 {
+		t.Fatalf("portless IPv6 entry on a port: %d", w.Code)
+	}
 }
 
 func TestCSRF(t *testing.T) {

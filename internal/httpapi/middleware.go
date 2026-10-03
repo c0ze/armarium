@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"mime"
-	"net"
 	"net/http"
 	"net/url"
 	"slices"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/c0ze/armarium/internal/auth"
+	"github.com/c0ze/armarium/internal/config"
 )
 
 const (
@@ -54,25 +54,9 @@ func (s *Server) base(next http.Handler) http.Handler {
 	})
 }
 
-// hostAllowed is the DNS-rebinding defence: an entry with a port must match
-// exactly, an entry without one matches that host on any port.
-func (s *Server) hostAllowed(hostport string) bool {
-	host := hostport
-	if h, _, err := net.SplitHostPort(hostport); err == nil {
-		host = h
-	}
-	host = strings.Trim(host, "[]")
-	for _, a := range s.Cfg.AllowedHosts {
-		if strings.EqualFold(a, hostport) || (!strings.Contains(strings.Trim(a, "[]"), ":") && strings.EqualFold(a, host)) {
-			return true
-		}
-	}
-	return false
-}
-
 func (s *Server) hosts(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/healthz" && !s.hostAllowed(r.Host) {
+		if r.URL.Path != "/healthz" && !config.HostAllowed(s.Cfg.AllowedHosts, r.Host) {
 			http.Error(w, "unknown host", http.StatusMisdirectedRequest)
 			return
 		}
@@ -185,7 +169,7 @@ func (s *Server) writeAllowed(w http.ResponseWriter, r *http.Request, p Principa
 	}
 	origin := r.Header.Get("Origin")
 	u, err := url.Parse(origin)
-	own := err == nil && origin != "" && s.hostAllowed(u.Host)
+	own := err == nil && origin != "" && config.HostAllowed(s.Cfg.AllowedHosts, u.Host)
 	ok := own
 	if p == Token { // not ambient: a script had to attach it explicitly
 		ok = origin == "" || own || slices.Contains(s.Cfg.CORSOrigins, origin)
