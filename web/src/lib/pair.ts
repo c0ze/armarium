@@ -2,6 +2,7 @@
 // <reader>/#opds=<catalogue>, which comics.skriv.ist and books.skriv.ist read on
 // startup; the token rides in the fragment, so it never reaches the reader's host.
 import qrcode from 'qrcode-generator';
+import { ApiError, type Token } from './api';
 
 const trimSlash = (s: string) => s.replace(/\/$/, '');
 
@@ -15,6 +16,19 @@ const pad = (n: number) => String(n).padStart(2, '0');
 /** A token name per pairing, e.g. comics-phone-2026-10-04-1532 (local time). */
 export function pairTokenName(id: string, d: Date): string {
   return `${id}-phone-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
+}
+
+type Created = { token: Token; secret: string };
+
+/** Creates the pairing token; a name already taken this minute gets -2. */
+export async function createPairToken(id: string, now: Date, create: (name: string) => Promise<Created>): Promise<Created> {
+  const name = pairTokenName(id, now);
+  try {
+    return await create(name);
+  } catch (err) {
+    if (!(err instanceof ApiError) || err.status !== 409) throw err;
+    return create(`${name}-2`);
+  }
 }
 
 /** The QR as one SVG path: a 1×1 square per dark module, inside a 4-module quiet zone. */

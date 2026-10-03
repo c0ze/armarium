@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import qrcode from 'qrcode-generator';
-import { isLoopback, pairLink, pairTokenName, qrPath } from './pair';
+import { ApiError, type Token } from './api';
+import { createPairToken, isLoopback, pairLink, pairTokenName, qrPath } from './pair';
 
 const secret = 'Ab-_' + 'x'.repeat(39);
 
@@ -50,5 +51,40 @@ describe('isLoopback', () => {
     expect(isLoopback('http://[::1]:8580')).toBe(true);
     expect(isLoopback('http://localhost:8580')).toBe(true);
     expect(isLoopback('https://armarium.example')).toBe(false);
+  });
+});
+
+describe('createPairToken', () => {
+  const now = new Date(2026, 9, 4, 15, 32);
+  const made = (name: string) => ({ token: { id: 1, name, createdAt: 0, lastUsedAt: null } as Token, secret: 's' });
+
+  it('names the token after the reader and the minute', async () => {
+    const create = vi.fn(async (name: string) => made(name));
+    await createPairToken('comics', now, create);
+    expect(create.mock.calls).toEqual([['comics-phone-2026-10-04-1532']]);
+  });
+
+  it('retries once with -2 when the name is taken', async () => {
+    const create = vi.fn(async (name: string) => made(name));
+    create.mockRejectedValueOnce(new ApiError(409, 'a token with that name exists'));
+    const r = await createPairToken('comics', now, create);
+    expect(create.mock.calls).toEqual([['comics-phone-2026-10-04-1532'], ['comics-phone-2026-10-04-1532-2']]);
+    expect(r.token.name).toBe('comics-phone-2026-10-04-1532-2');
+  });
+
+  it('gives up after the second conflict', async () => {
+    const create = vi.fn(async (_: string) => {
+      throw new ApiError(409, 'a token with that name exists');
+    });
+    await expect(createPairToken('comics', now, create)).rejects.toThrow('exists');
+    expect(create).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry other errors', async () => {
+    const create = vi.fn(async (_: string) => {
+      throw new ApiError(500, 'x');
+    });
+    await expect(createPairToken('comics', now, create)).rejects.toThrow('x');
+    expect(create).toHaveBeenCalledTimes(1);
   });
 });

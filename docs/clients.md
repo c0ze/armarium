@@ -23,6 +23,24 @@ test suite (valid Atom, link order, PSE attributes, token prefixes).
   as separate acquisition links.
 - There are no redirects anywhere, so strict clients that refuse them work.
 
+## Pairing a phone
+
+Admin → **Pair a phone** shows a QR code that opens Skrivist Comics
+(comics.skriv.ist) or Skrivist Books (books.skriv.ist) on a phone with this
+library's OPDS catalogue filled in; tap Connect and it's done. Each pairing creates
+its own token, named like `books-phone-2026-10-04-1532`.
+
+- Set `public_url` to the HTTPS address phones use, e.g.
+  `https://armarium.example.com`. Its host must be in `allowed_hosts`. The hosted
+  readers refuse plain-HTTP catalogues, so Admin won't pair over HTTP.
+- Add the reader origins to `cors_origins` (`https://comics.skriv.ist`,
+  `https://books.skriv.ist`): the readers fetch the catalogue from the browser.
+- The QR carries the token in the link's fragment, which never reaches the reader's
+  server. Once paired, OPDS requests carry it in the path, as any token-in-path client
+  does, so a reverse proxy's access log will contain it.
+- To unpair, revoke the token under API tokens, then forget the shelf on the phone.
+  Revoking stops access; it doesn't delete books already downloaded.
+
 ## PanelFlow and comics.skriv.ist
 
 These guided-view comic readers have an Armarium mode at `/armarium`: connect with

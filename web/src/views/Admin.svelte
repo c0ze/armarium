@@ -2,6 +2,7 @@
   import { onDestroy } from 'svelte';
   import { api, type Library, type ScanStatus, type Token } from '../lib/api';
   import Icon from './Icon.svelte';
+  import PairPhone from './PairPhone.svelte';
 
   let { admin }: { admin: boolean } = $props();
   let libraries = $state<Library[]>([]);
@@ -130,6 +131,8 @@
       {/each}
     </ul>
   </section>
+
+  <PairPhone onchange={async () => { tokens = await api.tokens(); }} />
 
   <section>
     <div class="bar"><h2>Connecting apps</h2></div>

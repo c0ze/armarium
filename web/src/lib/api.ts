@@ -80,6 +80,19 @@ export interface Token {
   lastUsedAt: number | null;
 }
 
+export interface PairReader {
+  id: string;
+  name: string;
+  url: string;
+  origin: string;
+  corsAllowed: boolean;
+}
+
+export interface PairInfo {
+  publicUrl: string;
+  readers: PairReader[];
+}
+
 export interface ScanStatus {
   running: boolean;
   startedAt: number;
@@ -140,6 +153,7 @@ export const api = {
   tokens: () => call<Token[]>('GET', '/api/tokens'),
   createToken: (name: string) => call<{ token: Token; secret: string }>('POST', '/api/tokens', { name }),
   deleteToken: (id: number) => call<void>('DELETE', `/api/tokens/${id}`),
+  pair: () => call<PairInfo>('GET', '/api/pair'),
 };
 
 export const coverUrl = (id: number) => `/api/items/${id}/cover`;
