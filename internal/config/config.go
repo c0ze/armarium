@@ -47,8 +47,11 @@ type Config struct {
 	DataDir      string   `toml:"data_dir"`
 	AllowedHosts []string `toml:"allowed_hosts"`
 	CORSOrigins  []string `toml:"cors_origins"`
-	PasswordHash string   `toml:"password_hash"`
-	SecureCookie bool     `toml:"secure_cookie"`
+	// PublicURL is the address phones and HTTPS readers use, e.g.
+	// https://armarium.example; pairing QR codes point there.
+	PublicURL    string `toml:"public_url"`
+	PasswordHash string `toml:"password_hash"`
+	SecureCookie bool   `toml:"secure_cookie"`
 	// PanelFlowURL is where PanelFlow is served (e.g. https://host/comics); the UI
 	// links comics to its Armarium mode there.
 	PanelFlowURL string    `toml:"panelflow_url"`
@@ -99,6 +102,9 @@ func applyEnv(c *Config) {
 	if v := os.Getenv("ARMARIUM_ALLOWED_HOSTS"); v != "" {
 		c.AllowedHosts = splitList(v)
 	}
+	if v := os.Getenv("ARMARIUM_PUBLIC_URL"); v != "" {
+		c.PublicURL = v
+	}
 	if v := os.Getenv("ARMARIUM_CORS_ORIGINS"); v != "" {
 		c.CORSOrigins = splitList(v)
 	}
@@ -120,6 +126,14 @@ func (c *Config) validate() error {
 	}
 	if c.PanelFlowURL != "" && !strings.HasPrefix(c.PanelFlowURL, "https://") && !strings.HasPrefix(c.PanelFlowURL, "http://") {
 		return fmt.Errorf("panelflow_url %q must be an http(s) URL", c.PanelFlowURL)
+	}
+	pub, err := canonicalPublicURL(c.PublicURL)
+	if err != nil {
+		return err
+	}
+	c.PublicURL = pub
+	if pub != "" && !HostAllowed(c.AllowedHosts, strings.SplitN(pub, "://", 2)[1]) {
+		return fmt.Errorf("%w (public_url %q, allowed_hosts %q)", errPublicHost, pub, c.AllowedHosts)
 	}
 	for _, o := range c.CORSOrigins {
 		if !strings.HasPrefix(o, "http://") && !strings.HasPrefix(o, "https://") {

@@ -1,7 +1,7 @@
 # Armarium configuration. Every key is optional unless marked required.
 # Environment variables override the file: ARMARIUM_LISTEN, ARMARIUM_DATA_DIR,
-# ARMARIUM_PASSWORD_HASH, ARMARIUM_ALLOWED_HOSTS and ARMARIUM_CORS_ORIGINS
-# (comma-separated). ARMARIUM_CONFIG names this file.
+# ARMARIUM_PASSWORD_HASH, ARMARIUM_PUBLIC_URL, ARMARIUM_ALLOWED_HOSTS and
+# ARMARIUM_CORS_ORIGINS (the last two comma-separated). ARMARIUM_CONFIG names this file.
 
 # Address to listen on. In Docker, use 0.0.0.0:8580.
 listen = "127.0.0.1:8580"
@@ -16,6 +16,10 @@ allowed_hosts = ["localhost", "127.0.0.1"]   # add e.g. "books.example.com", "19
 # Browser apps on other origins that may call the API with a token
 # (e.g. PanelFlow or comics.skriv.ist). Full origins, no trailing slash.
 cors_origins = []
+
+# The address phones and the hosted readers use: the "Pair a phone" QR codes in
+# Admin point here. HTTPS, no path; its host must be in allowed_hosts.
+# public_url = "https://armarium.example.com"
 
 # Owner password for the web UI, as an argon2id hash: `armarium hash-password`.
 # Without it the UI cannot log in; API tokens still work.
