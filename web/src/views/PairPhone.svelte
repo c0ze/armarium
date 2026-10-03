@@ -22,6 +22,7 @@
 
   async function pair(reader: PairReader) {
     error = '';
+    pairing = null; // never leave the previous phone's QR up if this attempt fails
     busy = true;
     try {
       const { token, secret } = await createPairToken(reader.id, new Date(), api.createToken);
