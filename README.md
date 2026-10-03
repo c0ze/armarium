@@ -17,6 +17,9 @@ An *armarium* was the cupboard where a medieval monastery kept its books.
   by the web UI, OPDS page streaming and connected readers.
 - **Web UI:** library grid with search and filters, an EPUB reader, a quick comic
   viewer, and an admin page for scanning and API tokens. Works on phones.
+- **Phone pairing:** Admin shows a QR code; scan it with the phone's camera and
+  [Skrivist Comics](https://comics.skriv.ist) or [Skrivist Books](https://books.skriv.ist)
+  opens with your library connected. No addresses or tokens to type.
 - **Light on hardware:** one static binary with pure-Go SQLite, about 30–50 MB of
   memory while scanning ten thousand books, incremental scans that only open new or
   changed files, and no background indexing unless you ask for it.
@@ -38,6 +41,22 @@ Then follow [docs/deploy.md](docs/deploy.md) for Docker Compose, Synology and
 systemd. Every setting is explained in
 [deploy/armarium.example.toml](deploy/armarium.example.toml).
 
+### Read on your phone
+
+1. Put Armarium behind HTTPS (a reverse proxy such as Synology's, Caddy or
+   Tailscale Serve) and set three things in `armarium.toml`:
+   ```toml
+   allowed_hosts = ["armarium.example.com"]
+   public_url    = "https://armarium.example.com"
+   cors_origins  = ["https://comics.skriv.ist", "https://books.skriv.ist"]
+   ```
+2. Restart, log in, open **Admin → Pair a phone** and pick Skrivist Comics or
+   Skrivist Books.
+3. Point the phone's camera at the QR code, open the link, tap **Connect**.
+
+Each pairing gets its own token; revoke it in Admin to unpair. Details in
+[docs/clients.md](docs/clients.md#pairing-a-phone).
+
 From source (Go 1.25+, Node 22+):
 
 ```bash
@@ -51,8 +70,10 @@ bin/armarium serve        # http://127.0.0.1:8580
 
 - **OPDS readers** (KOReader, Panels, Chunky, …): `/opds/v1.2/catalog` with Basic
   auth, or a token in the path for apps without it.
-- **PanelFlow / comics.skriv.ist:** guided panel-by-panel reading with progress
-  sync.
+- **Skrivist Comics and Skrivist Books** (comics.skriv.ist, books.skriv.ist):
+  offline-first readers in the browser; pair them from Admin with a QR code.
+- **PanelFlow / comics.skriv.ist Armarium mode:** guided panel-by-panel reading with
+  progress sync.
 - **Your own tools:** a small JSON API with bearer tokens.
 
 See [docs/clients.md](docs/clients.md). Coming from Kavita? `armarium import-kavita`

@@ -20,7 +20,8 @@ curl -L -o armarium.toml https://raw.githubusercontent.com/c0ze/armarium/main/de
    and set `user:` to the owner of `./data` (`id -u` / `id -g`).
 2. Edit `armarium.toml`: one `[[library]]` per folder (paths as seen inside the
    container), `listen = "0.0.0.0:8580"`, and every host name you will use in
-   `allowed_hosts`.
+   `allowed_hosts`. To read on a phone, also set `public_url` (your HTTPS address)
+   and `cors_origins` (see [Phones](#phones) below).
 3. Set the owner password:
    ```bash
    docker run --rm -i ghcr.io/c0ze/armarium hash-password
@@ -51,9 +52,26 @@ The same compose file works as a Container Manager **Project**:
    small NAS CPUs; `workers = 1` under `[scan]` keeps scans gentle.
 5. For HTTPS, add a reverse-proxy rule (Control Panel → Login Portal → Advanced →
    Reverse Proxy) from `https://books.example.com` to `http://localhost:8580`,
-   add that host to `allowed_hosts`, and set `secure_cookie = true`.
+   add that host to `allowed_hosts`, set `public_url = "https://books.example.com"`,
+   and set `secure_cookie = true` once you only log in through HTTPS.
 
 To update, pull the new image in Container Manager and rebuild the project.
+
+## Phones
+
+Skrivist Comics and Skrivist Books are web apps served over HTTPS, so they can only
+load an HTTPS Armarium, and only from origins Armarium allows:
+
+```toml
+allowed_hosts = ["books.example.com"]
+public_url    = "https://books.example.com"
+cors_origins  = ["https://comics.skriv.ist", "https://books.skriv.ist"]
+```
+
+Restart, then **Admin → Pair a phone**: pick a reader and scan the QR code with the
+phone's camera. Admin warns when `public_url` is missing, points at this computer,
+or a reader's origin is missing from `cors_origins`, and refuses to pair over plain
+HTTP. More in [clients.md](clients.md#pairing-a-phone).
 
 ## Binary and systemd
 
