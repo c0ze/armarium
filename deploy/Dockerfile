@@ -20,16 +20,20 @@ ARG VERSION=docker
 ARG TARGETOS TARGETARCH
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
     go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /armarium ./cmd/armarium \
- && mkdir -p /data && chown 65532:65532 /data
+ && mkdir -p /data /rootfs && chown 65532:65532 /data \
+ # SQLite spills big transactions (e.g. a migration over every row) to temp
+ # files; scratch has no /tmp, so give it one any user can write to.
+ && mkdir -m 1777 /rootfs/tmp
 
 FROM scratch
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=build /armarium /armarium
 COPY --from=build --chown=65532:65532 /data /data
+COPY --from=build /rootfs/ /
 # Non-root by default. On a NAS, run as the user that owns the data folder
 # (Synology: `user: "1026:100"` in compose, or your own id from `id`).
 USER 65532:65532
-ENV ARMARIUM_DATA_DIR=/data ARMARIUM_LISTEN=0.0.0.0:8580 ARMARIUM_CONFIG=/config/armarium.toml
+ENV ARMARIUM_DATA_DIR=/data ARMARIUM_LISTEN=0.0.0.0:8580 ARMARIUM_CONFIG=/config/armarium.toml TMPDIR=/tmp
 EXPOSE 8580
 VOLUME ["/data"]
 HEALTHCHECK --interval=5m --timeout=5s CMD ["/armarium", "healthcheck"]
