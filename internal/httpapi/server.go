@@ -78,6 +78,7 @@ func (s *Server) Handler() http.Handler {
 	route("GET /api/tokens", Admin, s.listTokens)
 	route("POST /api/tokens", Admin, s.createToken)
 	route("DELETE /api/tokens/{id}", Admin, s.deleteToken)
+	route("GET /api/pair", Admin, s.getPair)
 
 	m.HandleFunc("GET /read/base.css", serveBaseCSS)
 	route("GET /read/{id}/chapter/{n}", Reader, s.getChapter)
