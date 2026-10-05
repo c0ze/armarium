@@ -6,6 +6,9 @@ guided-view comic readers.
 
 An *armarium* was the cupboard where a medieval monastery kept its books.
 
+**[Project website](https://c0ze.github.io/armarium/)** — why Armarium exists,
+basic setup, and reading with Skrivist Books and Comics.
+
 - **Comics:** CBZ and CBR, streamed page by page (OPDS page streaming and a JSON API);
   series come from folders, issue numbers from file names.
 - **Books:** EPUB and PDF read in the browser; MOBI, AZW3, FB2, DjVu and anything
@@ -86,6 +89,8 @@ make check    # go vet, staticcheck (if installed), Go tests, svelte-check, UI t
 ```
 
 Architecture, data model and security design: [docs/design.md](docs/design.md).
+The GitHub Pages website lives in `site/`; see
+[docs/github-pages.md](docs/github-pages.md) to preview and publish it.
 
 ## License
 
