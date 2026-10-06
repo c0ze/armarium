@@ -169,7 +169,9 @@ func (s *Server) writeAllowed(w http.ResponseWriter, r *http.Request, p Principa
 	}
 	origin := r.Header.Get("Origin")
 	u, err := url.Parse(origin)
-	own := err == nil && origin != "" && config.HostAllowed(s.Cfg.AllowedHosts, u.Host)
+	// A custom-scheme webview is a token client, not Armarium's own web UI,
+	// even when its host is localhost and localhost is in allowed_hosts.
+	own := err == nil && (u.Scheme == "http" || u.Scheme == "https") && config.HostAllowed(s.Cfg.AllowedHosts, u.Host)
 	ok := own
 	if p == Token { // not ambient: a script had to attach it explicitly
 		ok = origin == "" || own || slices.Contains(s.Cfg.CORSOrigins, origin)

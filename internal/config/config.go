@@ -136,8 +136,10 @@ func (c *Config) validate() error {
 		return fmt.Errorf("%w (public_url %q, allowed_hosts %q)", errPublicHost, pub, c.AllowedHosts)
 	}
 	for _, o := range c.CORSOrigins {
-		if !strings.HasPrefix(o, "http://") && !strings.HasPrefix(o, "https://") {
-			return fmt.Errorf("cors_origins entry %q must be a full origin like https://host", o)
+		// Tauri's macOS webview uses this exact custom-scheme origin. Other
+		// custom schemes and opaque (null) origins must remain disallowed.
+		if o != "tauri://localhost" && !strings.HasPrefix(o, "http://") && !strings.HasPrefix(o, "https://") {
+			return fmt.Errorf("cors_origins entry %q must be an http(s) origin or tauri://localhost", o)
 		}
 	}
 	seen := map[string]bool{}

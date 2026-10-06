@@ -124,6 +124,59 @@ func TestCORSPreflightAndHeaders(t *testing.T) {
 	}
 }
 
+func TestDesktopCORSForJSONAndOPDS(t *testing.T) {
+	e := newEnv(t)
+	e.login()
+	origins := []string{"tauri://localhost", "http://tauri.localhost", "https://tauri.localhost"}
+	e.srv.Cfg.CORSOrigins = append(e.srv.Cfg.CORSOrigins, origins...)
+	for _, origin := range origins {
+		t.Run(origin, func(t *testing.T) {
+			for _, path := range []string{"/api/libraries", "/opds/v1.2/catalog", fmt.Sprintf("/api/items/%d/pages/1", e.comicID), fmt.Sprintf("/api/items/%d/file", e.bookID)} {
+				w := e.do(req{method: "OPTIONS", path: path, origin: origin, headers: map[string]string{
+					"Access-Control-Request-Method": "GET", "Access-Control-Request-Headers": "authorization"}})
+				if w.Code != http.StatusNoContent || w.Header().Get("Access-Control-Allow-Origin") != origin ||
+					!strings.Contains(w.Header().Get("Access-Control-Allow-Headers"), "Authorization") {
+					t.Fatalf("%s preflight: %d %v", path, w.Code, w.Header())
+				}
+				w = e.do(req{path: path, basic: e.token, origin: origin})
+				if w.Code != http.StatusOK || w.Header().Get("Access-Control-Allow-Origin") != origin ||
+					w.Header().Get("Access-Control-Allow-Credentials") != "" {
+					t.Fatalf("%s authenticated read: %d %v", path, w.Code, w.Header())
+				}
+				w = e.do(req{path: path, origin: origin})
+				if w.Code != http.StatusUnauthorized || w.Header().Get("Access-Control-Allow-Origin") != origin {
+					t.Fatalf("%s missing token: %d %v", path, w.Code, w.Header())
+				}
+			}
+			path := fmt.Sprintf("/api/items/%d/progress", e.comicID)
+			w := e.do(req{method: "OPTIONS", path: path, origin: origin, headers: map[string]string{
+				"Access-Control-Request-Method": "PUT", "Access-Control-Request-Headers": "authorization, content-type"}})
+			if w.Code != http.StatusNoContent || !strings.Contains(w.Header().Get("Access-Control-Allow-Methods"), "PUT") {
+				t.Fatalf("progress preflight: %d %v", w.Code, w.Header())
+			}
+			w = e.do(req{method: "PUT", path: path, token: e.token, origin: origin, body: `{"page":1}`})
+			if w.Code != http.StatusOK || w.Header().Get("Access-Control-Allow-Origin") != origin {
+				t.Fatalf("progress write: %d %v", w.Code, w.Header())
+			}
+			w = e.do(req{method: "PUT", path: path, cookie: true, origin: origin, body: `{"page":1}`})
+			if w.Code != http.StatusForbidden {
+				t.Fatalf("desktop origin must not authorize ambient session credentials: %d", w.Code)
+			}
+			w = e.do(req{method: "PUT", path: path, basic: e.token, origin: origin, body: `{"page":1}`})
+			if w.Code != http.StatusForbidden {
+				t.Fatalf("desktop writes need an explicit bearer token, not cached Basic credentials: %d", w.Code)
+			}
+		})
+	}
+	for _, origin := range []string{"null", "tauri://evil.example", "https://evil.example"} {
+		w := e.do(req{method: "OPTIONS", path: "/api/libraries", origin: origin, headers: map[string]string{
+			"Access-Control-Request-Method": "GET", "Access-Control-Request-Headers": "authorization"}})
+		if w.Header().Get("Access-Control-Allow-Origin") != "" {
+			t.Fatalf("unconfigured origin %q got CORS access", origin)
+		}
+	}
+}
+
 // Garbage and overflowing IDs are a 404, never a 500 (audit: int overflow).
 func TestBadIDsAre404(t *testing.T) {
 	e := newEnv(t)

@@ -50,6 +50,31 @@ func TestLoadRejectsBadConfig(t *testing.T) {
 	}
 }
 
+func TestDesktopCORSOrigins(t *testing.T) {
+	for _, origin := range []string{"tauri://localhost", "http://tauri.localhost", "https://tauri.localhost"} {
+		t.Run(origin, func(t *testing.T) {
+			p := filepath.Join(t.TempDir(), "f.toml")
+			os.WriteFile(p, []byte(fmt.Sprintf("cors_origins = [%q]\n", origin)), 0o600)
+			c, err := Load(p)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(c.CORSOrigins) != 1 || c.CORSOrigins[0] != origin {
+				t.Fatalf("origin was changed: %v", c.CORSOrigins)
+			}
+		})
+	}
+	for _, origin := range []string{"*", "null", "tauri://evil.example", "tauri://localhost/", "tauri://localhost:1234", "file://", "other://localhost"} {
+		t.Run(origin, func(t *testing.T) {
+			p := filepath.Join(t.TempDir(), "f.toml")
+			os.WriteFile(p, []byte(fmt.Sprintf("cors_origins = [%q]\n", origin)), 0o600)
+			if _, err := Load(p); err == nil {
+				t.Fatal("invalid origin was accepted")
+			}
+		})
+	}
+}
+
 func loadPublicURL(t *testing.T, publicURL string, hosts ...string) (Config, error) {
 	t.Helper()
 	p := filepath.Join(t.TempDir(), "f.toml")

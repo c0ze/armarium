@@ -58,6 +58,48 @@ from Armarium and progress saved back to it.
 - An HTTPS reader needs an HTTPS Armarium.
 - Set `panelflow_url` and Armarium's item pages link comics straight into the reader.
 
+## Skrivist Books and Comics desktop apps
+
+The macOS and Windows ports use the same direct requests as the hosted readers;
+the desktop webview has a different origin. Allow the origins explicitly in your
+Armarium config and restart the server:
+
+```toml
+cors_origins = [
+  "https://comics.skriv.ist",
+  "https://books.skriv.ist",
+  "tauri://localhost",         # macOS
+  "http://tauri.localhost",    # Windows default
+  "https://tauri.localhost",   # Windows builds using useHttpsScheme
+]
+```
+
+`tauri://localhost` requires an Armarium version containing desktop-origin
+support. Do not add `*`, `null`, other custom schemes, or a trailing slash.
+Origins are matched exactly. Both apps still need an API token; CORS does not
+grant authentication or permit cookies.
+
+In Comics, enter the server's base URL and the token in **Armarium**. In Books,
+use **Catalogues** with `https://<host>/opds/v1.2/catalog`, any nonempty username,
+and the token as the password. The allowlist covers library requests, downloads,
+page images and Comics progress writes. Existing desktop builds need no update
+for this server-side fix.
+
+To diagnose a rejected preflight without exposing a token:
+
+```sh
+curl -i -X OPTIONS 'https://<host>/api/libraries' \
+  -H 'Origin: tauri://localhost' \
+  -H 'Access-Control-Request-Method: GET' \
+  -H 'Access-Control-Request-Headers: authorization'
+```
+
+Expect HTTP 204 with `Access-Control-Allow-Origin: tauri://localhost` and
+Authorization in `Access-Control-Allow-Headers`. Repeat with the Windows origin
+and `/opds/v1.2/catalog` for Books. A 404/405 or missing allow-origin header means
+the running server/proxy has not enabled that origin. TLS, DNS and URL errors
+can also prevent a connection even when CORS is configured correctly.
+
 ## skriv.ist (Skrivist)
 
 Skrivist's OPDS browser works with Armarium's feeds for EPUBs. Its server-side
