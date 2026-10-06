@@ -9,7 +9,9 @@ run-name: Release ${{ inputs.version }}
 #   - ghcr.io/c0ze/armarium:<version> and :latest (linux/amd64, linux/arm64)
 #   - docker.io/coze/armarium:<version> and :latest, when DOCKERHUB_USERNAME and
 #     DOCKERHUB_TOKEN secrets are set
-#   - a GitHub release tagged <version> with static binaries and checksums
+#   - a draft GitHub release with Linux/Windows binaries and checksums
+# macOS is built, signed, notarized and stapled on the signing Mac, then uploaded
+# before publishing the draft. See docs/releasing.md.
 
 on:
   workflow_dispatch:
@@ -56,7 +58,7 @@ jobs:
       - name: Build binaries
         run: |
           mkdir -p dist
-          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do
+          for target in linux/amd64 linux/arm64 windows/amd64; do
             os=${target%/*}; arch=${target#*/}; ext=""; [ "$os" = windows ] && ext=.exe
             name="armarium_${VERSION#v}_${os}_${arch}"
             CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath \
@@ -97,9 +99,9 @@ jobs:
             org.opencontainers.image.licenses=MIT
           push: true
 
-      - name: GitHub release
+      - name: Draft GitHub release (awaiting signed macOS DMG)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$VERSION" --target "$GITHUB_SHA" --title "$VERSION" --generate-notes \
+          gh release create "$VERSION" --draft --target "$GITHUB_SHA" --title "$VERSION" --generate-notes \
             dist/*.tar.gz dist/*.zip dist/checksums.txt

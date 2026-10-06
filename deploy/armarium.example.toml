@@ -13,13 +13,17 @@ data_dir = "./data"
 # Host are refused. An entry without a port matches any port.
 allowed_hosts = ["localhost", "127.0.0.1"]   # add e.g. "books.example.com", "192.168.1.10"
 
-# Browser apps on other origins that may call the API with a token
-# (e.g. PanelFlow or comics.skriv.ist). Full origins, no trailing slash.
-cors_origins = []
-# Skrivist Books and Comics desktop apps call Armarium directly too. To allow
-# macOS and Windows builds, add these exact origins alongside your web readers:
-# "tauri://localhost", "http://tauri.localhost", "https://tauri.localhost"
-# No wildcard, null origin, or cookies are required. See docs/clients.md.
+# Skrivist Books and Comics: hosted readers and macOS/Windows desktop apps.
+# Requests still require an API token; cross-origin cookies are not allowed.
+# Full origins, no trailing slash. Remove any clients you do not use, or set []
+# to disable cross-origin access. See docs/clients.md.
+cors_origins = [
+  "https://comics.skriv.ist",
+  "https://books.skriv.ist",
+  "tauri://localhost",         # macOS
+  "http://tauri.localhost",    # Windows
+  "https://tauri.localhost",   # Windows with useHttpsScheme
+]
 
 # The address phones and the hosted readers use: the "Pair a phone" QR codes in
 # Admin point here. HTTPS, no path; its host must be in allowed_hosts.

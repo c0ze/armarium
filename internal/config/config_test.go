@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -72,6 +73,20 @@ func TestDesktopCORSOrigins(t *testing.T) {
 				t.Fatal("invalid origin was accepted")
 			}
 		})
+	}
+}
+
+func TestShippedExampleAllowsSkrivistWebAndDesktop(t *testing.T) {
+	c, err := Load(filepath.Join("..", "..", "deploy", "armarium.example.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"https://comics.skriv.ist", "https://books.skriv.ist",
+		"tauri://localhost", "http://tauri.localhost", "https://tauri.localhost",
+	}
+	if !slices.Equal(c.CORSOrigins, want) {
+		t.Fatalf("shipped example origins: got %v, want %v", c.CORSOrigins, want)
 	}
 }
 

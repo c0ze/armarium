@@ -65,13 +65,22 @@ load an HTTPS Armarium, and only from origins Armarium allows:
 ```toml
 allowed_hosts = ["books.example.com"]
 public_url    = "https://books.example.com"
-cors_origins  = ["https://comics.skriv.ist", "https://books.skriv.ist"]
+cors_origins  = [
+  "https://comics.skriv.ist", "https://books.skriv.ist",
+  "tauri://localhost", "http://tauri.localhost", "https://tauri.localhost",
+]
 ```
 
 Restart, then **Admin → Pair a phone**: pick a reader and scan the QR code with the
 phone's camera. Admin warns when `public_url` is missing, points at this computer,
 or a reader's origin is missing from `cors_origins`, and refuses to pair over plain
 HTTP. More in [clients.md](clients.md#pairing-a-phone).
+
+This list also supports Skrivist Books and Comics on macOS and Windows and is
+included in the example configuration from v0.3.2. Existing installations must
+add the desktop origins to their own `cors_origins` and restart after upgrading;
+the update does not replace your configuration. Keep any other reader origins
+you already use.
 
 ## Forgot the owner password?
 
@@ -88,7 +97,13 @@ instead. API tokens are unaffected.
 ## Binary and systemd
 
 Download the binary for your platform from the GitHub release, or build it
-(`make`, needs Go and Node). Then:
+(`make`, needs Go and Node).
+
+On macOS, use the universal DMG (Apple Silicon and Intel). It is signed,
+notarized, and stapled; mount it and copy `armarium` and the configuration example
+to a folder of your choice. Run the commands from Terminal.
+
+On Linux, install the binary and systemd service:
 
 ```bash
 install -m 755 armarium ~/.local/bin/

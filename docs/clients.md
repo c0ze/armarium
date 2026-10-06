@@ -74,8 +74,10 @@ cors_origins = [
 ]
 ```
 
-`tauri://localhost` requires an Armarium version containing desktop-origin
-support. Do not add `*`, `null`, other custom schemes, or a trailing slash.
+Desktop-origin support and this allowlist are included in v0.3.2 and later's
+example configuration. Existing installations must merge these origins into
+their own config after upgrading; an upgrade does not replace the file.
+Do not add `*`, `null`, other custom schemes, or a trailing slash.
 Origins are matched exactly. Both apps still need an API token; CORS does not
 grant authentication or permit cookies.
 

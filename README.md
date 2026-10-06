@@ -51,7 +51,10 @@ systemd. Every setting is explained in
    ```toml
    allowed_hosts = ["armarium.example.com"]
    public_url    = "https://armarium.example.com"
-   cors_origins  = ["https://comics.skriv.ist", "https://books.skriv.ist"]
+   cors_origins  = [
+     "https://comics.skriv.ist", "https://books.skriv.ist",
+     "tauri://localhost", "http://tauri.localhost", "https://tauri.localhost",
+   ]
    ```
 2. Restart, log in, open **Admin → Pair a phone** and pick Skrivist Comics or
    Skrivist Books.
@@ -59,6 +62,11 @@ systemd. Every setting is explained in
 
 Each pairing gets its own token; revoke it in Admin to unpair. Details in
 [docs/clients.md](docs/clients.md#pairing-a-phone).
+
+The example configuration also allows the Skrivist macOS and Windows apps.
+When upgrading an existing installation to v0.3.2 or later, add the three desktop
+origins above to your existing `cors_origins` and restart Armarium; upgrading
+the binary or Docker image preserves your configuration.
 
 From source (Go 1.25+, Node 22+):
 
@@ -91,6 +99,7 @@ make check    # go vet, staticcheck (if installed), Go tests, svelte-check, UI t
 Architecture, data model and security design: [docs/design.md](docs/design.md).
 The GitHub Pages website lives in `site/`; see
 [docs/github-pages.md](docs/github-pages.md) to preview and publish it.
+Release builds and macOS signing: [docs/releasing.md](docs/releasing.md).
 
 ## License
 
