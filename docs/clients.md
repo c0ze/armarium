@@ -120,6 +120,8 @@ GET  /api/items?library=&series=&q=&status=&tag=&source=&sort=&offset=&limit=
 GET  /api/items/{id}                     item (with progress) + library
 GET  /api/items/{id}/cover               JPEG thumbnail
 GET  /api/items/{id}/pages/{n}           comic page n (1-based)
+GET  /api/items/{id}/pages/{n}/panels    shared correction or null
+PUT  /api/items/{id}/pages/{n}/panels    save shared panels with expected revision
 GET  /api/items/{id}/file[?format=mobi]  the file (Range supported)
 GET  /api/items/{id}/toc                 EPUB table of contents
 PUT  /api/items/{id}/progress            {"page": n} | {"status": "read"|"unread"}
@@ -128,3 +130,51 @@ PUT  /api/items/{id}/progress            {"page": n} | {"status": "read"|"unread
 Progress only moves forward: a lower `page` is ignored (`"applied": false`) unless
 you send `"reset": true`; `{"status": "unread"}` resets it. Details in
 [design.md](design.md).
+
+## Shared comic panel corrections
+
+Clients supporting the panel editor can save geometry and reading order once on
+Armarium and reuse it on other devices. Corrections belong to the comic page,
+not a token or account. Any authenticated reader may edit them. Generic OPDS
+clients continue reading normally; they must implement this API to use panels.
+Skrivist Comics uses it for streaming and Armarium OPDS downloads/phone pairing.
+
+`GET /api/items/{id}/pages/{n}/panels` returns `{"correction": null}` when there
+is no record, otherwise a correction object. Responses are authenticated and
+`no-store`. Pages are 1-based; only CBZ/CBR comic pages are supported.
+
+A PUT sends this shape (`rect` is normalized X, Y, width, height):
+
+```json
+{
+  "imageHash": "<lowercase SHA-256 of the page image bytes>",
+  "revision": 0,
+  "enabled": true,
+  "pageSize": { "w": 1200, "h": 1800 },
+  "direction": "ltr",
+  "panels": [{ "id": 0, "rect": [0.05, 0.05, 0.9, 0.4] }],
+  "automaticPanels": [{ "id": 0, "rect": [0.04, 0.04, 0.91, 0.41] }],
+  "automaticCandidates": [[0.04, 0.04, 0.91, 0.41]],
+  "detector": { "model": "frame-detector", "revision": "model-revision" }
+}
+```
+
+Array order is the explicit reading order; IDs must be unique nonnegative
+integers. Up to 100 edited panels are allowed, each inside the page and at least
+0.5% wide/high. Geometry, bounds and body size are validated. The server hashes
+the original page before accepting the annotation; images are not uploaded.
+
+Revision 0 creates a record. Later saves send the revision returned by GET;
+successful writes increment it and set `updatedAt` (Unix seconds). HTTP 409 means
+the page bytes changed or a newer correction exists: reload before editing.
+This compare-and-swap is atomic, so stale clients cannot erase a newer edit.
+`enabled:true` with an empty panel array means intentional whole-page reading.
+`enabled:false` writes a retained reset tombstone; automatic detection resumes.
+Do not send `updatedAt` in PUT requests; timestamps come from the server.
+
+Migration 004 creates the SQLite annotation table automatically. Back up the
+database and comic files as usual. Metadata survives app/device changes and
+rescans; replaced images are distinguished by their content hash. Original
+predictions/order and detector identity remain available alongside reviewed
+annotations for training and regression evaluation. Model retraining and
+publishing validated weights remain a separate process.
