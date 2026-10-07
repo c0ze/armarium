@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # Build a universal CLI in a signed, notarized and stapled DMG. No credentials
-# are stored here; notarytool uses an existing login-keychain profile.
+# are stored here; notarytool uses an existing keychain profile.
+#
+# Run on the signing Mac. A local Terminal session signs with the (unlocked)
+# login keychain. Over ssh the login keychain is locked, so the default is the
+# dedicated gand-signing keychain, unlocked here for this session from its
+# password file. Override with MAC_KEYCHAIN, MAC_KEYCHAIN_PASS_FILE,
+# MAC_NOTARY_PROFILE and MAC_SIGN_IDENTITY.
 set -euo pipefail
 
 version=${1:?Usage: scripts/notarize-macos.sh vX.Y.Z OUTPUT_DIRECTORY}
@@ -11,11 +17,20 @@ cd "$(dirname "$0")/.."
 [[ -z $(git status --porcelain) ]] || { echo "Commit the release source first" >&2; exit 1; }
 mkdir -p "$output_dir"
 output_dir=$(cd "$output_dir" && pwd)
-identity=${DEVELOPER_ID:-Developer ID Application: Gand (7696W4CMNC)}
-keychain=${SIGNING_KEYCHAIN:-$HOME/Library/Keychains/login.keychain-db}
-profile=${NOTARY_PROFILE:-gand-notary}
+identity=${MAC_SIGN_IDENTITY:-Developer ID Application: Gand (7696W4CMNC)}
+if [[ -n ${SSH_CONNECTION:-} ]]; then
+  keychain=${MAC_KEYCHAIN:-$HOME/Library/Keychains/gand-signing.keychain-db}
+  pass_file=${MAC_KEYCHAIN_PASS_FILE:-$HOME/apple-signing/kcpass}
+else
+  keychain=${MAC_KEYCHAIN:-$HOME/Library/Keychains/login.keychain-db}
+  pass_file=${MAC_KEYCHAIN_PASS_FILE:-}   # the login keychain is already unlocked
+fi
+profile=${MAC_NOTARY_PROFILE:-gand-notary}
 scratch=$(mktemp -d "${TMPDIR:-/tmp}/armarium-macos.XXXXXX")
 trap 'rm -rf "$scratch"' EXIT
+
+# The unlock lasts for this session only.
+if [[ -n "$pass_file" ]]; then security unlock-keychain -p "$(cat "$pass_file")" "$keychain"; fi
 
 (cd web && npm ci --no-audit --no-fund && npm run build)
 for arch in amd64 arm64; do

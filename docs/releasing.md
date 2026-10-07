@@ -11,10 +11,13 @@
    ```
    This builds an Intel/Apple Silicon universal CLI, signs it with Developer ID,
    and signs, notarizes and staples its DMG. The default identity is
-   `Developer ID Application: Gand (7696W4CMNC)`; the `gand-notary` profile lives
-   in the login keychain. `DEVELOPER_ID`, `SIGNING_KEYCHAIN` and `NOTARY_PROFILE`
-   can select another existing identity/profile. Never add signing credentials
-   to the repository or release assets.
+   `Developer ID Application: Gand (7696W4CMNC)` with the `gand-notary`
+   profile. In a local Terminal session it signs with the login keychain; over
+   ssh (where the login keychain is locked) it uses the dedicated
+   `gand-signing` keychain and unlocks it for that session from its password
+   file. `MAC_SIGN_IDENTITY`, `MAC_KEYCHAIN`, `MAC_KEYCHAIN_PASS_FILE` and
+   `MAC_NOTARY_PROFILE` select another existing identity, keychain or profile.
+   Never add signing credentials to the repository or release assets.
 3. Download the draft's Linux/Windows archives into the release-assets directory:
    ```sh
    gh release download vX.Y.Z --dir /absolute/path/to/release-assets \
