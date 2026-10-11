@@ -3,6 +3,7 @@ package formats
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -232,5 +233,38 @@ func TestSolidRARPages(t *testing.T) {
 		if b, _ := pageBytes(t, c, i); !bytes.Equal(b, want[i]) {
 			t.Fatalf("page %d: %q", i+1, b)
 		}
+	}
+}
+
+// Each solid decoder holds a dictionary of up to maxRarDict, and the comics
+// cache keeps several archives open: only the most recent few stay live.
+func TestSolidDecodersStayFewAcrossComics(t *testing.T) {
+	dir := t.TempDir()
+	var open []*rarContainer
+	for i := range maxLiveSolid + 1 {
+		c, err := Open(tu.WriteSolidRAR(t, dir, fmt.Sprintf("solid%d.cbr", i), comicEntries()...), "cbr", lim)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer c.Close()
+		pageBytes(t, c, 1) // a solid entry: needs a sequential decoder
+		open = append(open, c.(*rarContainer))
+	}
+	live := func(c *rarContainer) bool { c.mu.Lock(); defer c.mu.Unlock(); return c.seq != nil }
+	if live(open[0]) {
+		t.Fatal("the least recently used decoder must be closed")
+	}
+	for i, c := range open[1:] {
+		if !live(c) {
+			t.Fatalf("decoder %d closed too early", i+1)
+		}
+	}
+	// The first comic read again starts over, and the next least recently used closes.
+	// (Page 1 is the archive's third entry; its first, page10, needs no decoder.)
+	if b, _ := pageBytes(t, open[0], 0); !bytes.Equal(b, tu.PNG(2, 2, 1)) {
+		t.Fatalf("page 1 after a restart: %q", b)
+	}
+	if live(open[1]) || !live(open[0]) {
+		t.Fatal("the cap must follow the most recent reads")
 	}
 }

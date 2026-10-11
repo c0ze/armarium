@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"math"
 	"path"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -18,6 +19,46 @@ import (
 // 64 GiB; comics use 4–32 MiB (WinRAR's RAR5 default is 32 MiB), and the NAS
 // container has 256 MiB in total.
 const maxRarDict = 32 << 20
+
+// maxLiveSolid bounds the solid-archive decoders kept open across all
+// containers: each holds a dictionary of up to maxRarDict, and the comics cache
+// keeps several archives open. The least recently used closes first; its comic
+// starts over if it is read again.
+const maxLiveSolid = 2
+
+var solid struct {
+	sync.Mutex
+	live []*rarContainer // least recently used first
+}
+
+// keepSeq records c, which holds c.mu and an open sequential reader, as the
+// most recent solid decoder and closes the least recently used beyond the cap.
+// A container busy reading is not idle: it stays open and first in line.
+func keepSeq(c *rarContainer) {
+	solid.Lock()
+	solid.live = append(slices.DeleteFunc(solid.live, func(o *rarContainer) bool { return o == c }), c)
+	var over []*rarContainer
+	for len(solid.live) > maxLiveSolid {
+		over, solid.live = append(over, solid.live[0]), solid.live[1:]
+	}
+	solid.Unlock()
+	for _, o := range over {
+		if !o.mu.TryLock() { // never wait on another container while holding c.mu
+			solid.Lock()
+			solid.live = append([]*rarContainer{o}, solid.live...)
+			solid.Unlock()
+			continue
+		}
+		o.closeSeq()
+		o.mu.Unlock()
+	}
+}
+
+func forgetSeq(c *rarContainer) {
+	solid.Lock()
+	solid.live = slices.DeleteFunc(solid.live, func(o *rarContainer) bool { return o == c })
+	solid.Unlock()
+}
 
 // rarContainer uses rardecode's RarFS, which indexes file header offsets once so
 // page N seeks straight to its entry in non-solid archives. Entries of a solid
@@ -143,6 +184,7 @@ func (c *rarContainer) solidEntry(name string) ([]byte, error) {
 			if int64(len(b)) > limit {
 				return nil, ErrTooLarge
 			}
+			keepSeq(c)
 			return b, nil
 		}
 		c.closeSeq() // the page is behind the reader: start over once
@@ -154,6 +196,7 @@ func (c *rarContainer) closeSeq() error {
 	if c.seq == nil {
 		return nil
 	}
+	forgetSeq(c)
 	err := c.seq.Close()
 	c.seq = nil
 	return err
