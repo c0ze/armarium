@@ -35,6 +35,12 @@ func (s *Server) getTOC(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	release, err := s.acquire(r.Context())
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	defer release()
 	e, done, err := s.openEPUB(r.Context(), it)
 	if err != nil {
 		s.fail(w, r, err)
@@ -123,6 +129,12 @@ func (s *Server) getChapter(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, errNotFound)
 		return
 	}
+	release, err := s.acquire(r.Context())
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	defer release()
 	e, done, err := s.openEPUB(r.Context(), it)
 	if err != nil {
 		s.fail(w, r, err)
@@ -159,6 +171,12 @@ func (s *Server) getResource(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, errNotFound)
 		return
 	}
+	release, err := s.acquire(r.Context())
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	defer release()
 	e, done, err := s.openEPUB(r.Context(), it)
 	if err != nil {
 		s.fail(w, r, err)

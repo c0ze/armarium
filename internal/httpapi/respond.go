@@ -70,7 +70,7 @@ func queryID(r *http.Request, name string) int64 {
 
 // acquire takes an archive-read slot, waiting briefly before giving up.
 func (s *Server) acquire(ctx context.Context) (func(), error) {
-	t := time.NewTimer(10 * time.Second)
+	t := time.NewTimer(s.wait)
 	defer t.Stop()
 	select {
 	case s.sem <- struct{}{}:

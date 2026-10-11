@@ -28,6 +28,7 @@ type Server struct {
 	comics  *formats.Cache[formats.Container]
 	books   *formats.Cache[*formats.EPUB]
 	sem     chan struct{} // bounds concurrent archive reads
+	wait    time.Duration // how long a request waits for a slot before 503
 	logins  *loginLimiter
 	proxies []netip.Prefix // trusted_proxies
 }
@@ -40,6 +41,7 @@ func New(cfg config.Config, st *store.Store, sc *scan.Scanner, cv *covers.Servic
 		books:   formats.NewCache[*formats.EPUB](4),
 		sem:     make(chan struct{}, cfg.Limits.MaxOpenArchives),
 		logins:  newLoginLimiter(),
+		wait:    10 * time.Second,
 		proxies: cfg.ProxyPrefixes(),
 	}
 	if sc != nil {

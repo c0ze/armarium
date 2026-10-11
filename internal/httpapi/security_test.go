@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestEverythingButHealthzNeedsAuth(t *testing.T) {
@@ -413,5 +414,26 @@ func TestSessionCookieIsSecureBehindAnHTTPSProxy(t *testing.T) {
 	}
 	if c := login("192.0.2.9:1"); strings.Contains(c, "Secure") {
 		t.Fatalf("an untrusted peer cannot claim HTTPS: %q", c)
+	}
+}
+
+// EPUB chapters read up to 8 MiB from an archive, like comic pages: they share
+// the max_open_archives slots, so a burst of them cannot exhaust a small NAS.
+func TestEPUBReadsShareTheArchiveSlots(t *testing.T) {
+	e := newEnv(t)
+	e.srv.wait = 20 * time.Millisecond
+	for range cap(e.srv.sem) {
+		e.srv.sem <- struct{}{}
+	}
+	t.Cleanup(func() {
+		for range cap(e.srv.sem) {
+			<-e.srv.sem
+		}
+	})
+	for _, p := range []string{"/read/%d/chapter/0", "/api/items/%d/toc"} {
+		w := e.do(req{path: fmt.Sprintf(p, e.bookID), token: e.token})
+		if w.Code != http.StatusServiceUnavailable || w.Header().Get("Retry-After") == "" {
+			t.Fatalf("%s with every slot taken: %d %v", p, w.Code, w.Header())
+		}
 	}
 }
