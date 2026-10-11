@@ -4,15 +4,15 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"strconv"
 )
 
-// ItemsWithPageState lists the comics whose stored page numbers matter: a
-// reading position or panel corrections. Missing files are left out.
-func (s *Store) ItemsWithPageState(ctx context.Context) ([]Item, error) {
+// ItemsWithOldPageNumbers lists the comics that still hold a reading position
+// or panel corrections in the page numbering before v0.5.0 (page_order 1).
+// Missing files are left out until a scan finds them again.
+func (s *Store) ItemsWithOldPageNumbers(ctx context.Context) ([]Item, error) {
 	rows, err := s.DB.QueryContext(ctx, "SELECT "+itemCols+itemFrom+` WHERE i.format IN ('cbz', 'cbr') AND i.missing_at IS NULL
-		AND (COALESCE(p.page, 0) > 0 OR EXISTS (SELECT 1 FROM panel_correction c WHERE c.item_id = i.id))
-		ORDER BY i.id`)
+		AND (COALESCE(p.page_order, ?) < ? OR EXISTS (SELECT 1 FROM panel_correction c WHERE c.item_id = i.id AND c.page_order < ?))
+		ORDER BY i.id`, PageOrder, PageOrder, PageOrder)
 	if err != nil {
 		return nil, err
 	}
@@ -28,93 +28,75 @@ func (s *Store) ItemsWithPageState(ctx context.Context) ([]Item, error) {
 	return out, rows.Err()
 }
 
-// PageOrderDone reports whether RemapPages already ran for an item.
-func (s *Store) PageOrderDone(ctx context.Context, itemID int64) (bool, error) {
-	v, err := s.Meta(ctx, pageOrderKey(itemID))
-	return v != "", err
-}
+// staging lifts an item's old corrections clear of every real page while they
+// are renumbered, so no step collides with a row not yet moved.
+const staging = 1 << 40
 
-func pageOrderKey(itemID int64) string { return "page_order:" + strconv.FormatInt(itemID, 10) }
-
-// RemapPages moves an item's reading position and panel corrections from old
-// page numbers to new ones (to: old → new; nil when nothing moves) and marks
-// the item done, all in one transaction: a crash never maps an item twice.
-// A finished ("read") position stays at the end of the book.
+// RemapPages moves an item's rows still in the old numbering to the current one
+// (to: old page → new page; nil when nothing moves), in one transaction. Rows
+// written since the upgrade stay where they are: an old correction whose new
+// page already holds a newer one is dropped. A finished ("read") position
+// stays at the end of the book, and a correction beyond the archive keeps its
+// number. updated_at stays: clients learn of the renumbering from Item.PageOrder.
 func (s *Store) RemapPages(ctx context.Context, itemID int64, to map[int]int) error {
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if to != nil {
-		var page int
-		var status string
-		err := tx.QueryRowContext(ctx, "SELECT page, status FROM progress WHERE item_id = ?", itemID).Scan(&page, &status)
-		switch {
-		case errors.Is(err, sql.ErrNoRows):
-		case err != nil:
-			return err
-		case status != "read" && page > 0 && to[page] != 0 && to[page] != page:
-			// updated_at stays: clients learn of the renumbering from Item.PageOrder.
-			if _, err := tx.ExecContext(ctx, "UPDATE progress SET page = ? WHERE item_id = ?", to[page], itemID); err != nil {
-				return err
-			}
+	// The first statement writes, so the transaction holds the write lock before
+	// it reads anything: no API write can land between a read and its update.
+	if _, err := tx.ExecContext(ctx, "UPDATE panel_correction SET page = page + ? WHERE item_id = ? AND page_order < ?", staging, itemID, PageOrder); err != nil {
+		return err
+	}
+	var page int
+	var status string
+	err = tx.QueryRowContext(ctx, "SELECT page, status FROM progress WHERE item_id = ? AND page_order < ?", itemID, PageOrder).Scan(&page, &status)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+	case err != nil:
+		return err
+	default:
+		if status != "read" && page > 0 && to[page] != 0 {
+			page = to[page]
 		}
-		if err := remapCorrections(ctx, tx, itemID, to); err != nil {
-			return err
-		}
-	}
-	if _, err := tx.ExecContext(ctx, "INSERT INTO meta (key, value) VALUES (?, '2') ON CONFLICT (key) DO NOTHING", pageOrderKey(itemID)); err != nil {
-		return err
-	}
-	return tx.Commit()
-}
-
-// remapCorrections renumbers through a staging range above every page the item
-// has, so no step can collide with a row not yet moved. A row whose page is not
-// in the mapping (beyond the archive) goes back where it was, or is dropped if
-// a moved row now holds that page.
-func remapCorrections(ctx context.Context, tx *sql.Tx, itemID int64, to map[int]int) error {
-	var top int
-	if err := tx.QueryRowContext(ctx, "SELECT COALESCE(MAX(page), 0) FROM panel_correction WHERE item_id = ?", itemID).Scan(&top); err != nil {
-		return err
-	}
-	off := max(top, len(to)) + 1
-	if _, err := tx.ExecContext(ctx, "UPDATE panel_correction SET page = page + ? WHERE item_id = ?", off, itemID); err != nil {
-		return err
-	}
-	for old, page := range to {
-		if _, err := tx.ExecContext(ctx, "UPDATE panel_correction SET page = ? WHERE item_id = ? AND page = ?", page, itemID, old+off); err != nil {
+		if _, err := tx.ExecContext(ctx, "UPDATE progress SET page = ?, page_order = ? WHERE item_id = ?", page, PageOrder, itemID); err != nil {
 			return err
 		}
 	}
-	rows, err := tx.QueryContext(ctx, "SELECT page FROM panel_correction WHERE item_id = ? AND page >= ?", itemID, off)
+	rows, err := tx.QueryContext(ctx, "SELECT page FROM panel_correction WHERE item_id = ? AND page_order < ?", itemID, PageOrder)
 	if err != nil {
 		return err
 	}
-	var left []int
+	var staged []int
 	for rows.Next() {
 		var p int
 		if err := rows.Scan(&p); err != nil {
 			rows.Close()
 			return err
 		}
-		left = append(left, p)
+		staged = append(staged, p)
 	}
 	rows.Close()
-	for _, p := range left {
-		var taken int
-		if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM panel_correction WHERE item_id = ? AND page = ?", itemID, p-off).Scan(&taken); err != nil {
-			return err
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, p := range staged {
+		page := p - staging
+		if n := to[page]; n != 0 {
+			page = n
 		}
-		if taken > 0 {
-			_, err = tx.ExecContext(ctx, "DELETE FROM panel_correction WHERE item_id = ? AND page = ?", itemID, p)
-		} else {
-			_, err = tx.ExecContext(ctx, "UPDATE panel_correction SET page = ? WHERE item_id = ? AND page = ?", p-off, itemID, p)
-		}
+		res, err := tx.ExecContext(ctx, "UPDATE OR IGNORE panel_correction SET page = ?, page_order = ? WHERE item_id = ? AND page = ?", page, PageOrder, itemID, p)
 		if err != nil {
 			return err
 		}
+		if n, err := res.RowsAffected(); err != nil {
+			return err
+		} else if n == 0 { // a correction written since the upgrade holds that page
+			if _, err := tx.ExecContext(ctx, "DELETE FROM panel_correction WHERE item_id = ? AND page = ?", itemID, p); err != nil {
+				return err
+			}
+		}
 	}
-	return nil
+	return tx.Commit()
 }

@@ -10,26 +10,22 @@ import (
 	"github.com/c0ze/armarium/internal/formats"
 )
 
-// RemapPageOrder moves reading positions and panel corrections to the page
-// numbers of the root-first order (v0.5.0), once. Comics whose pages were
-// numbered differently before keep each reader's place and every correction
-// on its own image. Each comic is marked as it is done; the global marker is
-// set only when none failed, so an unreadable archive is retried next start.
+// RemapPageOrder moves reading positions and panel corrections stored in the
+// numbering before v0.5.0 to the root-first page numbers, so comics whose pages
+// were numbered differently keep each reader's place and every correction on
+// its own image. Every row records the numbering it was written in, so only
+// rows from before the upgrade move, each once, however often this runs. A
+// comic that cannot be opened or is missing keeps its rows for a later start
+// or scan. It runs at every start and after every scan; with nothing left in
+// the old numbering it is one query.
 func (s *Scanner) RemapPageOrder(ctx context.Context) error {
-	if v, err := s.Store.Meta(ctx, "page_order"); err != nil || v == "2" {
+	items, err := s.Store.ItemsWithOldPageNumbers(ctx)
+	if err != nil || len(items) == 0 {
 		return err
 	}
-	items, err := s.Store.ItemsWithPageState(ctx)
-	if err != nil {
-		return err
-	}
+	s.Log.Info("page order: renumbering stored pages", "comics", len(items))
 	failed := 0
 	for _, it := range items {
-		if done, err := s.Store.PageOrderDone(ctx, it.ID); err != nil {
-			return err
-		} else if done {
-			continue
-		}
 		lib, err := s.Store.Library(ctx, it.LibraryID)
 		if err != nil {
 			return err
@@ -49,14 +45,8 @@ func (s *Scanner) RemapPageOrder(ctx context.Context) error {
 			return err
 		}
 	}
-	if failed > 0 {
-		return nil
-	}
-	if err := s.Store.SetMeta(ctx, "page_order", "2"); err != nil {
-		return err
-	}
-	_, err = s.Store.DB.ExecContext(ctx, "DELETE FROM meta WHERE key LIKE 'page_order:%'")
-	return err
+	s.Log.Info("page order: stored pages renumbered", "comics", len(items)-failed, "retry_later", failed)
+	return nil
 }
 
 // pageMapping maps each old page number (NaturalLess order, before v0.5.0) to

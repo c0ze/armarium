@@ -107,9 +107,9 @@ func (s *Store) SavePanelCorrection(ctx context.Context, itemID int64, page int,
 	}
 	var result sql.Result
 	if expected == 0 {
-		result, err = s.DB.ExecContext(ctx, "INSERT INTO panel_correction (item_id,page,revision,document) VALUES (?,?,?,?) ON CONFLICT (item_id,page) DO NOTHING", itemID, page, correction.Revision, string(document))
+		result, err = s.DB.ExecContext(ctx, "INSERT INTO panel_correction (item_id,page,revision,document,page_order) VALUES (?,?,?,?,?) ON CONFLICT (item_id,page) DO NOTHING", itemID, page, correction.Revision, string(document), PageOrder)
 	} else {
-		result, err = s.DB.ExecContext(ctx, "UPDATE panel_correction SET revision = ?, document = ? WHERE item_id = ? AND page = ? AND revision = ?", correction.Revision, string(document), itemID, page, expected)
+		result, err = s.DB.ExecContext(ctx, "UPDATE panel_correction SET revision = ?, document = ?, page_order = ? WHERE item_id = ? AND page = ? AND revision = ?", correction.Revision, string(document), PageOrder, itemID, page, expected)
 	}
 	if err != nil {
 		return nil, err

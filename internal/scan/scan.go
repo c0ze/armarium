@@ -83,6 +83,12 @@ func (s *Scanner) Run(ctx context.Context, only string) error {
 		if _, err := s.Store.Prune(ctx, missingKeep); err != nil {
 			firstErr = cmpOr(firstErr, err)
 		}
+		// A comic found again (or readable again) still has its pages in the
+		// numbering before v0.5.0: renumber them before it is read.
+		if err := s.RemapPageOrder(ctx); err != nil {
+			s.Log.Error("page order remap failed", "err", err)
+			firstErr = cmpOr(firstErr, err)
+		}
 	} else {
 		firstErr = err
 	}

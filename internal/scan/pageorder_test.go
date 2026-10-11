@@ -46,6 +46,22 @@ func correctionAt(st *store.Store, itemID int64, page int) bool {
 	return c != nil
 }
 
+// beforeTheUpgrade marks an item's state as written in the old numbering, as
+// migration 006 does for an installation upgrading to v0.5.0.
+func beforeTheUpgrade(t *testing.T, st *store.Store, ids ...int64) {
+	t.Helper()
+	for _, id := range ids {
+		for _, q := range []string{
+			"UPDATE progress SET page_order = 1 WHERE item_id = ? AND page > 0 AND status <> 'read'",
+			"UPDATE panel_correction SET page_order = 1 WHERE item_id = ?",
+		} {
+			if _, err := st.DB.Exec(q, id); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+}
+
 // scanned builds a library from the files and returns item ids by path.
 func scanned(t *testing.T, files map[string][]tu.Entry) (*Scanner, *store.Store, map[string]int64, string) {
 	t.Helper()
@@ -74,6 +90,7 @@ func TestRemapPageOrderKeepsEachPlace(t *testing.T) {
 	st.SaveProgress(ctx, reading, 3, store.ProgressUpdate{Page: 2})              // old page 2: chapter1/02
 	st.SaveProgress(ctx, done, 3, store.ProgressUpdate{Page: 3, Status: "read"}) // finished: the end of the book
 	correction(t, st, reading, 3)                                                // drawn on the cover (old page 3)
+	beforeTheUpgrade(t, st, reading, done)
 	if err := sc.RemapPageOrder(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -85,9 +102,6 @@ func TestRemapPageOrderKeepsEachPlace(t *testing.T) {
 	}
 	if !correctionAt(st, reading, 1) || correctionAt(st, reading, 3) {
 		t.Fatal("the cover's correction must move to page 1")
-	}
-	if v, _ := st.Meta(ctx, "page_order"); v != "2" {
-		t.Fatalf("page_order marker %q", v)
 	}
 	// A second start changes nothing.
 	if err := sc.RemapPageOrder(ctx); err != nil {
@@ -104,7 +118,8 @@ func TestRemapPageOrderIsCrashSafe(t *testing.T) {
 	id, gone := ids["S/nested.cbz"], ids["S/gone.cbz"]
 	st.SaveProgress(ctx, id, 3, store.ProgressUpdate{Page: 2})
 	st.SaveProgress(ctx, gone, 3, store.ProgressUpdate{Page: 2})
-	// A crash after this item's own transaction, before the global marker.
+	beforeTheUpgrade(t, st, id, gone)
+	// A crash after this item's own transaction, before the others.
 	if err := st.RemapPages(ctx, id, pageMapping([]string{"cover.png", "chapter1/01.png", "chapter1/02.png"})); err != nil {
 		t.Fatal(err)
 	}
@@ -116,8 +131,59 @@ func TestRemapPageOrderIsCrashSafe(t *testing.T) {
 	if p := pageOf(t, st, id); p.Page != 3 {
 		t.Fatalf("an item already remapped was mapped again: page %d", p.Page)
 	}
-	if v, _ := st.Meta(ctx, "page_order"); v != "" {
-		t.Fatal("the global marker must wait until every comic is remapped")
+	if p := pageOf(t, st, gone); p.Page != 2 {
+		t.Fatalf("an archive that cannot be opened keeps its old page for a later start: page %d", p.Page)
+	}
+}
+
+// The first start could not open one comic, so the remap runs again at the next
+// start. A comic first read and corrected in between must keep its new numbers.
+func TestRemapLeavesStateWrittenSince(t *testing.T) {
+	sc, st, ids, root := scanned(t, map[string][]tu.Entry{"S/gone.cbz": nested(), "S/later.cbz": nested()})
+	ctx := context.Background()
+	gone, later := ids["S/gone.cbz"], ids["S/later.cbz"]
+	st.SaveProgress(ctx, gone, 3, store.ProgressUpdate{Page: 2})
+	beforeTheUpgrade(t, st, gone)
+	os.Remove(filepath.Join(root, "S/gone.cbz"))
+	if err := sc.RemapPageOrder(ctx); err != nil {
+		t.Fatal(err)
+	}
+	st.SaveProgress(ctx, later, 3, store.ProgressUpdate{Page: 1}) // the cover, in the new numbering
+	correction(t, st, later, 1)
+	if err := sc.RemapPageOrder(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if p := pageOf(t, st, later); p.Page != 1 || !correctionAt(st, later, 1) || correctionAt(st, later, 2) {
+		t.Fatalf("state written since the upgrade was remapped: page %d", p.Page)
+	}
+}
+
+// A comic missing when the remap ran keeps its old numbers until it is back, and
+// is remapped by the scan that finds it again.
+func TestComicMissingAtTheUpgradeIsRemappedWhenItReturns(t *testing.T) {
+	sc, st, ids, root := scanned(t, map[string][]tu.Entry{"S/away.cbz": nested()})
+	ctx := context.Background()
+	id := ids["S/away.cbz"]
+	st.SaveProgress(ctx, id, 3, store.ProgressUpdate{Page: 2}) // old page 2: chapter1/02
+	beforeTheUpgrade(t, st, id)
+	aside := filepath.Join(t.TempDir(), "away.cbz")
+	if err := os.Rename(filepath.Join(root, "S/away.cbz"), aside); err != nil {
+		t.Fatal(err)
+	}
+	if err := sc.Run(ctx, ""); err != nil {
+		t.Fatal(err)
+	}
+	if p := pageOf(t, st, id); p.Page != 2 {
+		t.Fatalf("a missing comic was remapped without its archive: page %d", p.Page)
+	}
+	if err := os.Rename(aside, filepath.Join(root, "S/away.cbz")); err != nil {
+		t.Fatal(err)
+	}
+	if err := sc.Run(ctx, ""); err != nil {
+		t.Fatal(err)
+	}
+	if p := pageOf(t, st, id); p.Page != 3 {
+		t.Fatalf("the returning comic resumes on page %d, want 3 (chapter1/02)", p.Page)
 	}
 }
 
@@ -142,6 +208,7 @@ func TestRemapStagesCorrectionsClearOfExistingPages(t *testing.T) {
 	id := ids["S/nested.cbz"]
 	correction(t, st, id, 2)
 	correction(t, st, id, 1000002) // valid in the table when max_entries is large
+	beforeTheUpgrade(t, st, id)
 	if err := sc.RemapPageOrder(ctx); err != nil {
 		t.Fatal(err)
 	}

@@ -16,7 +16,9 @@ type ProgressUpdate struct {
 
 // SaveProgress applies u to item and returns the stored progress. Without Reset the
 // write is monotonic, enforced in SQL: a lower page than the stored one is ignored
-// and a "read" status is never downgraded. applied reports whether the write landed.
+// and a "read" status is never downgraded. A stored page from the numbering before
+// v0.5.0 does not compare with a current one, so any write replaces it. applied
+// reports whether the write landed.
 // updated_at increases with every applied write, even within one second, so it
 // orders changes: readers compare it to tell which side changed last.
 func (s *Store) SaveProgress(ctx context.Context, itemID int64, pages int, u ProgressUpdate) (p Progress, applied bool, err error) {
@@ -33,19 +35,21 @@ func (s *Store) SaveProgress(ctx context.Context, itemID int64, pages int, u Pro
 	}
 	var res sql.Result
 	if u.Reset {
-		res, err = s.DB.ExecContext(ctx, `INSERT INTO progress (item_id, page, locator, status, updated_at)
-			VALUES (?, ?, ?, ?, ?)
+		res, err = s.DB.ExecContext(ctx, `INSERT INTO progress (item_id, page, locator, status, updated_at, page_order)
+			VALUES (?, ?, ?, ?, ?, ?)
 			ON CONFLICT (item_id) DO UPDATE SET page = excluded.page, locator = excluded.locator,
-			  status = excluded.status, updated_at = MAX(excluded.updated_at, progress.updated_at + 1)`,
-			itemID, u.Page, u.Locator, status, s.now())
+			  status = excluded.status, updated_at = MAX(excluded.updated_at, progress.updated_at + 1),
+			  page_order = excluded.page_order`,
+			itemID, u.Page, u.Locator, status, s.now(), PageOrder)
 	} else {
-		res, err = s.DB.ExecContext(ctx, `INSERT INTO progress (item_id, page, locator, status, updated_at)
-			VALUES (?, ?, ?, ?, ?)
+		res, err = s.DB.ExecContext(ctx, `INSERT INTO progress (item_id, page, locator, status, updated_at, page_order)
+			VALUES (?, ?, ?, ?, ?, ?)
 			ON CONFLICT (item_id) DO UPDATE SET page = excluded.page, locator = excluded.locator,
 			  status = CASE WHEN progress.status = 'read' THEN 'read' ELSE excluded.status END,
-			  updated_at = MAX(excluded.updated_at, progress.updated_at + 1)
-			WHERE excluded.page >= progress.page`,
-			itemID, u.Page, u.Locator, status, s.now())
+			  updated_at = MAX(excluded.updated_at, progress.updated_at + 1),
+			  page_order = excluded.page_order
+			WHERE excluded.page >= progress.page OR progress.page_order <> excluded.page_order`,
+			itemID, u.Page, u.Locator, status, s.now(), PageOrder)
 	}
 	if err != nil {
 		return p, false, err
@@ -68,12 +72,12 @@ func (s *Store) ProgressOf(ctx context.Context, itemID int64) (Progress, error) 
 // ImportProgress writes progress from another app, keeping whichever side was
 // updated more recently. Used by the Kavita and Skrivist importers.
 func (s *Store) ImportProgress(ctx context.Context, itemID int64, p Progress) (bool, error) {
-	res, err := s.DB.ExecContext(ctx, `INSERT INTO progress (item_id, page, locator, status, updated_at)
-		VALUES (?, ?, ?, ?, ?)
+	res, err := s.DB.ExecContext(ctx, `INSERT INTO progress (item_id, page, locator, status, updated_at, page_order)
+		VALUES (?, ?, ?, ?, ?, ?)
 		ON CONFLICT (item_id) DO UPDATE SET page = excluded.page, locator = excluded.locator,
-		  status = excluded.status, updated_at = excluded.updated_at
+		  status = excluded.status, updated_at = excluded.updated_at, page_order = excluded.page_order
 		WHERE excluded.updated_at > progress.updated_at`,
-		itemID, p.Page, p.Locator, p.Status, p.UpdatedAt)
+		itemID, p.Page, p.Locator, p.Status, p.UpdatedAt, PageOrder)
 	if err != nil {
 		return false, err
 	}
