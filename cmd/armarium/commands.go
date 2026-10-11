@@ -14,6 +14,7 @@ import (
 
 	"github.com/c0ze/armarium/internal/auth"
 	"github.com/c0ze/armarium/internal/config"
+	"github.com/c0ze/armarium/internal/store"
 )
 
 // healthcheck probes /healthz on the listen address from ARMARIUM_LISTEN. The
@@ -107,6 +108,57 @@ func (a *app) token(ctx context.Context, args []string) error {
 		return fmt.Errorf("no token named %q", args[1])
 	default:
 		return fmt.Errorf("unknown token command %q", args[0])
+	}
+	return nil
+}
+
+func (a *app) library(ctx context.Context, args []string) error {
+	if len(args) == 0 {
+		return errors.New("library list | library rename <old> <new> | library rm <name>")
+	}
+	switch args[0] {
+	case "list":
+		libs, err := a.store.Libraries(ctx)
+		if err != nil {
+			return err
+		}
+		configured := map[string]bool{}
+		for _, l := range a.cfg.Libraries {
+			configured[l.Name] = true
+		}
+		w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
+		fmt.Fprintln(w, "NAME\tCONFIGURED\tITEMS")
+		for _, l := range libs {
+			_, n, err := a.store.Items(ctx, store.ItemFilter{LibraryID: l.ID, Limit: 1})
+			if err != nil {
+				return err
+			}
+			yes := "no"
+			if configured[l.Name] {
+				yes = "yes"
+			}
+			fmt.Fprintf(w, "%s\t%s\t%d\n", l.Name, yes, n)
+		}
+		return w.Flush()
+	case "rename":
+		if len(args) != 3 {
+			return errors.New("library rename <old> <new>")
+		}
+		if err := a.store.RenameLibrary(ctx, args[1], args[2]); err != nil {
+			return fmt.Errorf("rename %q: %w", args[1], err)
+		}
+		fmt.Printf("renamed %q to %q\n", args[1], args[2])
+	case "rm":
+		if len(args) != 2 {
+			return errors.New("library rm <name>")
+		}
+		n, err := a.store.RemoveLibrary(ctx, args[1])
+		if err != nil {
+			return fmt.Errorf("remove %q: %w", args[1], err)
+		}
+		fmt.Printf("removed %q and %d items\n", args[1], n)
+	default:
+		return fmt.Errorf("unknown library command %q", args[0])
 	}
 	return nil
 }

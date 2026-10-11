@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strconv"
 	"strings"
 )
 
@@ -25,8 +26,22 @@ type Series struct {
 	CoverItemID int64 `json:"coverItemId"`
 }
 
-// SyncLibraries makes the library table match the configured libraries (config is
-// the source of truth). Libraries removed from config are deleted with their items.
+// UnconfiguredError lists libraries the database holds but the config no
+// longer names.
+type UnconfiguredError struct{ Names []string }
+
+func (e *UnconfiguredError) Error() string {
+	quoted := make([]string, len(e.Names))
+	for i, n := range e.Names {
+		quoted[i] = strconv.Quote(n)
+	}
+	return "library " + strings.Join(quoted, ", ") + " is in the database but not in the config"
+}
+
+// SyncLibraries makes every configured library exist. It never deletes one: a
+// library missing from the config (a rename, a typo, one commented out) keeps
+// its items, progress and panel corrections, and SyncLibraries reports it and
+// writes nothing. RenameLibrary and RemoveLibrary are the explicit ways out.
 func (s *Store) SyncLibraries(ctx context.Context, libs []Library) error {
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -42,14 +57,65 @@ func (s *Store) SyncLibraries(ctx context.Context, libs []Library) error {
 			return err
 		}
 	}
-	q := "DELETE FROM library"
+	q := "SELECT name FROM library"
 	if len(names) > 0 {
 		q += " WHERE name NOT IN (?" + strings.Repeat(",?", len(names)-1) + ")"
 	}
-	if _, err := tx.ExecContext(ctx, q, names...); err != nil {
+	rows, err := tx.QueryContext(ctx, q+" ORDER BY name", names...)
+	if err != nil {
 		return err
 	}
+	var unconfigured []string
+	for rows.Next() {
+		var n string
+		if err := rows.Scan(&n); err != nil {
+			rows.Close()
+			return err
+		}
+		unconfigured = append(unconfigured, n)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if len(unconfigured) > 0 {
+		return &UnconfiguredError{Names: unconfigured}
+	}
 	return tx.Commit()
+}
+
+// RenameLibrary gives a library a new name and keeps everything in it.
+func (s *Store) RenameLibrary(ctx context.Context, from, to string) error {
+	res, err := s.DB.ExecContext(ctx, "UPDATE library SET name = ? WHERE name = ?", to, from)
+	if err != nil {
+		return err // including a UNIQUE violation when `to` exists
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// RemoveLibrary deletes a library with its items, progress and panel
+// corrections, and reports how many items went.
+func (s *Store) RemoveLibrary(ctx context.Context, name string) (int, error) {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	var id int64
+	if err := tx.QueryRowContext(ctx, "SELECT id FROM library WHERE name = ?", name).Scan(&id); err != nil {
+		return 0, notFound(err)
+	}
+	var items int
+	if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM item WHERE library_id = ?", id).Scan(&items); err != nil {
+		return 0, err
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM library WHERE id = ?", id); err != nil {
+		return 0, err
+	}
+	return items, tx.Commit()
 }
 
 func (s *Store) Libraries(ctx context.Context) ([]Library, error) {

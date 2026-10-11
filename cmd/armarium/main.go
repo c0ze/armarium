@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -32,6 +33,9 @@ commands:
   scan [library]            scan libraries once and exit
   token add <name>          create an API token (printed once)
   token list | token rm <name>
+  library list              libraries in the database, configured or not
+  library rename <old> <new>   keep a library's items and progress under a new name
+  library rm <name>         delete a library with its items and reading progress
   hash-password             read a password on stdin, print its argon2id hash
   import-skrivist --db reader_index.db --library <name>
   import-kavita   --db kavita.db --library <name> --root <kavita path prefix>
@@ -67,7 +71,8 @@ func main() {
 		exit(healthcheck())
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	a, err := open(*cfgPath, log)
+	// library repairs the mismatch that open refuses, so it skips the check.
+	a, err := open(*cfgPath, log, cmd != "library")
 	if err != nil {
 		exit(err)
 	}
@@ -83,6 +88,8 @@ func main() {
 		err = a.scanner.Run(ctx, only)
 	case "token":
 		err = a.token(ctx, args)
+	case "library":
+		err = a.library(ctx, args)
 	case "import-skrivist":
 		err = a.importSkrivist(ctx, args)
 	case "import-kavita":
@@ -104,7 +111,7 @@ func exit(err error) {
 	os.Exit(0)
 }
 
-func open(cfgPath string, log *slog.Logger) (*app, error) {
+func open(cfgPath string, log *slog.Logger, sync bool) (*app, error) {
 	if cfgPath == "" {
 		if _, err := os.Stat("armarium.toml"); err == nil {
 			cfgPath = "armarium.toml"
@@ -125,9 +132,16 @@ func open(cfgPath string, log *slog.Logger) (*app, error) {
 	for i, l := range cfg.Libraries {
 		libs[i] = store.Library{Name: l.Name, Root: l.Root, Kind: l.Kind}
 	}
-	if err := st.SyncLibraries(context.Background(), libs); err != nil {
-		st.Close()
-		return nil, err
+	if sync {
+		if err := st.SyncLibraries(context.Background(), libs); err != nil {
+			st.Close()
+			var unconfigured *store.UnconfiguredError
+			if errors.As(err, &unconfigured) {
+				name := strconv.Quote(unconfigured.Names[0])
+				return nil, fmt.Errorf("%w. Put it back in the config, rename it with `armarium library rename %s NEW`, or delete it and its reading progress with `armarium library rm %s`", err, name, name)
+			}
+			return nil, err
+		}
 	}
 	sc := &scan.Scanner{
 		Store: st, Libraries: cfg.Libraries, Workers: cfg.Scan.Workers, Log: log,
