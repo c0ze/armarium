@@ -86,6 +86,8 @@ func (s *Server) cors(next http.Handler) http.Handler {
 			h.Set("Access-Control-Allow-Origin", origin)
 			h.Set("Access-Control-Expose-Headers", "Content-Length, Content-Range, Content-Disposition, ETag, Retry-After, X-Armarium-Pages")
 			if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
+				// The answer depends on what the preflight asks for, not only on its origin.
+				h.Add("Vary", "Access-Control-Request-Method, Access-Control-Request-Headers, Access-Control-Request-Private-Network")
 				h.Set("Access-Control-Allow-Methods", "GET, HEAD, PUT, POST, DELETE")
 				h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, Range, If-None-Match, If-Range")
 				if r.Header.Get("Access-Control-Request-Private-Network") == "true" {

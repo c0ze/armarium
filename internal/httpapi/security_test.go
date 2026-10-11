@@ -330,3 +330,15 @@ func TestOPDSAliasAndVary(t *testing.T) {
 		t.Fatalf("expose: %q", exp)
 	}
 }
+
+func TestPreflightVariesOnItsRequestHeaders(t *testing.T) {
+	e := newEnv(t)
+	w := e.do(req{method: "OPTIONS", path: "/api/libraries", origin: "https://comics.skriv.ist", headers: map[string]string{
+		"Access-Control-Request-Method": "GET", "Access-Control-Request-Headers": "authorization"}})
+	vary := strings.Join(w.Header().Values("Vary"), ",")
+	for _, h := range []string{"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", "Access-Control-Request-Private-Network"} {
+		if !strings.Contains(vary, h) {
+			t.Fatalf("preflight Vary %q lacks %s", vary, h)
+		}
+	}
+}
