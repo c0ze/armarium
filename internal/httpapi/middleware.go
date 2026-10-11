@@ -68,16 +68,23 @@ func (s *Server) hosts(next http.Handler) http.Handler {
 // API and OPDS with tokens. No credentials: those clients never send cookies.
 func (s *Server) cors(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		origin := r.Header.Get("Origin")
-		api := strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/opds/")
-		if api && origin != "" && slices.Contains(s.Cfg.CORSOrigins, origin) {
-			h := w.Header()
-			h.Add("Vary", "Origin")
+		p := r.URL.Path
+		if p != "/opds" && !strings.HasPrefix(p, "/api/") && !strings.HasPrefix(p, "/opds/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		// Responses differ by Origin even for origins that get no CORS headers.
+		h := w.Header()
+		h.Add("Vary", "Origin")
+		if origin := r.Header.Get("Origin"); origin != "" && slices.Contains(s.Cfg.CORSOrigins, origin) {
 			h.Set("Access-Control-Allow-Origin", origin)
-			h.Set("Access-Control-Expose-Headers", "Content-Length, Content-Range")
+			h.Set("Access-Control-Expose-Headers", "Content-Length, Content-Range, Content-Disposition, ETag, Retry-After, X-Armarium-Pages")
 			if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
 				h.Set("Access-Control-Allow-Methods", "GET, HEAD, PUT, POST, DELETE")
-				h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+				h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, Range, If-None-Match, If-Range")
+				if r.Header.Get("Access-Control-Request-Private-Network") == "true" {
+					h.Set("Access-Control-Allow-Private-Network", "true")
+				}
 				h.Set("Access-Control-Max-Age", "600")
 				w.WriteHeader(http.StatusNoContent)
 				return

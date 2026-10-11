@@ -94,7 +94,9 @@ func (s *Server) Handler() http.Handler {
 		writeError(w, http.StatusNotFound, "not found")
 	}))
 	m.Handle("/", s.ui())
-	return s.base(s.hosts(s.cors(m)))
+	// CORS runs before the Host check: a preflight carries no credentials and
+	// reveals nothing, and a reader can then read the 421 an unlisted host gets.
+	return s.base(s.cors(s.hosts(m)))
 }
 
 // Serve runs the HTTP server until ctx is cancelled.

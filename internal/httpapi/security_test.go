@@ -301,3 +301,32 @@ func TestAdminRevokesTokens(t *testing.T) {
 		t.Fatalf("DELETE with a non-JSON body: %d", w.Code)
 	}
 }
+
+func TestCORSAnswersBeforeTheHostCheck(t *testing.T) {
+	e := newEnv(t)
+	o := "https://comics.skriv.ist"
+	pre := map[string]string{"Access-Control-Request-Method": "GET", "Access-Control-Request-Headers": "authorization", "Access-Control-Request-Private-Network": "true"}
+	w := e.do(req{method: "OPTIONS", path: "/opds/v1.2/catalog", host: "nas.example", origin: o, headers: pre})
+	if w.Code != http.StatusNoContent || w.Header().Get("Access-Control-Allow-Origin") != o || w.Header().Get("Access-Control-Allow-Private-Network") != "true" {
+		t.Fatalf("preflight to an unlisted host: %d %v", w.Code, w.Header())
+	}
+	w = e.do(req{path: "/opds/v1.2/catalog", host: "nas.example", origin: o, token: e.token})
+	if w.Code != http.StatusMisdirectedRequest || w.Header().Get("Access-Control-Allow-Origin") != o {
+		t.Fatalf("readers must be able to read the 421: %d %v", w.Code, w.Header())
+	}
+}
+
+func TestOPDSAliasAndVary(t *testing.T) {
+	e := newEnv(t)
+	o := "https://comics.skriv.ist"
+	if w := e.do(req{path: "/opds", origin: o, token: e.token}); w.Code != 200 || w.Header().Get("Access-Control-Allow-Origin") != o {
+		t.Fatalf("/opds: %d %v", w.Code, w.Header())
+	}
+	w := e.do(req{path: "/api/libraries", origin: "https://evil.example", token: e.token})
+	if w.Header().Get("Access-Control-Allow-Origin") != "" || !strings.Contains(strings.Join(w.Header().Values("Vary"), ","), "Origin") {
+		t.Fatalf("an unlisted origin still varies the response: %v", w.Header())
+	}
+	if exp := e.do(req{path: "/api/libraries", origin: o, token: e.token}).Header().Get("Access-Control-Expose-Headers"); !strings.Contains(exp, "Retry-After") || !strings.Contains(exp, "ETag") {
+		t.Fatalf("expose: %q", exp)
+	}
+}
