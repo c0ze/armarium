@@ -159,8 +159,11 @@ export const api = {
   pair: () => call<PairInfo>('GET', '/api/pair'),
 };
 
-export const coverUrl = (id: number) => `/api/items/${id}/cover`;
-export const pageUrl = (id: number, n: number) => `/api/items/${id}/pages/${n}`;
+// Browsers keep pages for a day and covers for a week without asking again. Naming
+// the page order (2: root-first, since v0.5.0) keeps images cached under the old
+// order from showing up under the new page numbers.
+export const coverUrl = (id: number) => `/api/items/${id}/cover?o=2`;
+export const pageUrl = (id: number, n: number) => `/api/items/${id}/pages/${n}?o=2`;
 export const fileUrl = (id: number, inline = false, format = '') =>
   `/api/items/${id}/file${inline ? '?inline=1' : format ? `?format=${encodeURIComponent(format)}` : ''}`;
 export const readable = (format: string) => ['cbz', 'cbr', 'epub', 'pdf'].includes(format);

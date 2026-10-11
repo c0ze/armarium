@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api, fileUrl, formatSize, percent, query, readable, seriesOf, type Item } from './api';
+import { api, coverUrl, fileUrl, formatSize, pageUrl, percent, query, readable, seriesOf, type Item } from './api';
 
 const item = (page: number, pages: number, status: Item['progress']['status'] = 'reading') =>
   ({ pages, progress: { page, status, locator: '', updatedAt: 0 } }) as Item;
@@ -41,5 +41,12 @@ describe('api writes', () => {
     vi.stubGlobal('fetch', fetch);
     await api.deleteToken(7);
     expect(fetch).toHaveBeenCalledWith('/api/tokens/7', expect.objectContaining({ method: 'DELETE', headers: { 'Content-Type': 'application/json' } }));
+  });
+});
+
+describe('image URLs', () => {
+  it('name the page order, so a browser never shows a page or cover cached from before v0.5.0', () => {
+    expect(pageUrl(7, 3)).toBe('/api/items/7/pages/3?o=2');
+    expect(coverUrl(7)).toBe('/api/items/7/cover?o=2');
   });
 });
