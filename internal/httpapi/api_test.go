@@ -2,10 +2,14 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/c0ze/armarium/internal/store"
 	tu "github.com/c0ze/armarium/internal/testutil"
@@ -193,5 +197,39 @@ func TestPageNamesAndNumbering(t *testing.T) {
 	// A cached page of another numbering must not be revalidated as current.
 	if etag := e.do(req{path: fmt.Sprintf("/api/items/%d/pages/1", e.comicID), token: e.token}).Header().Get("ETag"); !strings.HasSuffix(etag, `-p2"`) {
 		t.Fatalf("page ETag %q lacks the numbering generation", etag)
+	}
+}
+
+func calibreCover(t *testing.T, e *env) (store.Item, string) {
+	t.Helper()
+	it := e.items["Infection"]
+	root := e.srv.Cfg.Libraries[2].Root
+	return it, filepath.Join(filepath.Dir(filepath.Join(root, filepath.FromSlash(it.Path))), "cover.jpg")
+}
+
+func TestCalibreCoverMustStayInTheLibrary(t *testing.T) {
+	e := newEnv(t)
+	it, cover := calibreCover(t, e)
+	outside := filepath.Join(t.TempDir(), "elsewhere.png")
+	os.WriteFile(outside, tu.PNG(40, 60, 90), 0o644)
+	os.Remove(cover)
+	if err := os.Symlink(outside, cover); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.srv.inLibrary(context.Background(), it.LibraryID, cover); err != errNotFound {
+		t.Fatalf("a cover.jpg pointing outside the library: %v", err)
+	}
+}
+
+func TestCalibreCoverEditsRefreshTheThumbnail(t *testing.T) {
+	e := newEnv(t)
+	it, cover := calibreCover(t, e)
+	path := fmt.Sprintf("/api/items/%d/cover", it.ID)
+	before := e.do(req{path: path, token: e.token}).Body.Bytes()
+	os.WriteFile(cover, tu.PNG(40, 60, 30), 0o644)
+	later := time.Now().Add(time.Hour)
+	os.Chtimes(cover, later, later)
+	if after := e.do(req{path: path, token: e.token}).Body.Bytes(); bytes.Equal(before, after) {
+		t.Fatal("a cover edited in Calibre still shows the old thumbnail")
 	}
 }

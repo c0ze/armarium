@@ -25,19 +25,29 @@ func (s *Server) filePath(ctx context.Context, it store.Item) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return s.inLibrary(ctx, it.LibraryID, filepath.Join(lib.Root, filepath.FromSlash(it.Path)))
+}
+
+// inLibrary resolves p (symlinks included) and returns its real path, or
+// errNotFound when it leads outside the library's root.
+func (s *Server) inLibrary(ctx context.Context, libraryID int64, p string) (string, error) {
+	lib, err := s.Store.Library(ctx, libraryID)
+	if err != nil {
+		return "", err
+	}
 	root, err := filepath.EvalSymlinks(lib.Root)
 	if err != nil {
 		return "", errNotFound
 	}
-	p, err := filepath.EvalSymlinks(filepath.Join(lib.Root, filepath.FromSlash(it.Path)))
+	real, err := filepath.EvalSymlinks(p)
 	if err != nil {
 		return "", errNotFound
 	}
-	rel, err := filepath.Rel(root, p)
+	rel, err := filepath.Rel(root, real)
 	if err != nil || rel == ".." || strings.HasPrefix(rel, "../") || filepath.IsAbs(rel) {
 		return "", errNotFound
 	}
-	return p, nil
+	return real, nil
 }
 
 func (s *Server) openComic(ctx context.Context, it store.Item) (formats.Container, func(), error) {
@@ -179,17 +189,27 @@ func (s *Server) serveCover(w http.ResponseWriter, r *http.Request, it store.Ite
 			return releasing(rc, done, err)
 		}
 	}
+	version := it.MTime
 	if s.calibreLibrary(ctx, it.LibraryID) {
 		// Calibre keeps the cover it chose (or the user set) next to the files;
 		// many books have none there, so the file's own cover is the fallback.
+		// The cover must resolve inside the library, and editing it in Calibre
+		// (which leaves the book file alone) makes a new thumbnail.
+		cover := ""
+		if p, err := s.filePath(ctx, it); err == nil {
+			if c, err := s.inLibrary(ctx, it.LibraryID, filepath.Join(filepath.Dir(p), "cover.jpg")); err == nil {
+				cover = c
+				if st, err := os.Stat(c); err == nil {
+					version = max(version, st.ModTime().Unix())
+				}
+			}
+		}
 		embedded := src
 		src = func() (io.ReadCloser, error) {
-			p, err := s.filePath(ctx, it)
-			if err != nil {
-				return nil, err
-			}
-			if f, err := os.Open(filepath.Join(filepath.Dir(p), "cover.jpg")); err == nil {
-				return f, nil
+			if cover != "" {
+				if f, err := os.Open(cover); err == nil {
+					return f, nil
+				}
 			}
 			if embedded == nil {
 				return nil, covers.ErrNoCover
@@ -206,7 +226,7 @@ func (s *Server) serveCover(w http.ResponseWriter, r *http.Request, it store.Ite
 		s.fail(w, r, err)
 		return
 	}
-	p, err := s.Covers.Path(it.ID, it.MTime, src)
+	p, err := s.Covers.Path(it.ID, version, src)
 	release()
 	if err == covers.ErrNoCover {
 		err = errNotFound
