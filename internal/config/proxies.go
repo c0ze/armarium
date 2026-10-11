@@ -10,7 +10,14 @@ import (
 func parseProxy(s string) (netip.Prefix, error) {
 	s = strings.TrimSpace(s)
 	if p, err := netip.ParsePrefix(s); err == nil {
-		return netip.PrefixFrom(p.Addr().Unmap(), p.Bits()-unmappedBits(p.Addr())).Masked(), nil
+		bits := p.Bits() - unmappedBits(p.Addr())
+		switch {
+		case bits < 0:
+			return netip.Prefix{}, fmt.Errorf("trusted_proxies entry %q: an IPv4-mapped prefix needs at least /96; write the IPv4 form, such as 172.17.0.1", s)
+		case bits == 0:
+			return netip.Prefix{}, fmt.Errorf("trusted_proxies entry %q would trust every address to report the client's address", s)
+		}
+		return netip.PrefixFrom(p.Addr().Unmap(), bits).Masked(), nil
 	}
 	if a, err := netip.ParseAddr(s); err == nil {
 		a = a.Unmap()

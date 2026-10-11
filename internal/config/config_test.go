@@ -182,6 +182,28 @@ func TestTrustedProxies(t *testing.T) {
 	}
 }
 
+// A trusted_proxies entry that trusts nothing or every address is a mistake the
+// owner should hear about at start, not a silent change in who may spoof headers.
+func TestTrustedProxiesRefuseEntriesThatTrustNothingOrEveryone(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "armarium.toml")
+	os.WriteFile(p, []byte(`trusted_proxies = ["::ffff:172.17.0.1", "::ffff:10.0.0.0/104"]`), 0o600)
+	c, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range []string{"172.17.0.1", "10.9.8.7"} {
+		if !Trusted(c.ProxyPrefixes(), netip.MustParseAddr(s)) {
+			t.Errorf("%s should be trusted", s)
+		}
+	}
+	for _, entry := range []string{"::ffff:172.17.0.1/32", "0.0.0.0/0", "::/0", "::ffff:0.0.0.0/96"} {
+		os.WriteFile(p, []byte(`trusted_proxies = ["`+entry+`"]`), 0o600)
+		if _, err := Load(p); err == nil {
+			t.Errorf("%s must be refused", entry)
+		}
+	}
+}
+
 func TestCORSOriginsAreCanonical(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "armarium.toml")
 	os.WriteFile(p, []byte(`cors_origins = ["HTTPS://Books.Skriv.Ist/", "https://comics.skriv.ist:443", "TAURI://localhost", "http://[::1]:8080"]`), 0o600)
