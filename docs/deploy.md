@@ -134,7 +134,14 @@ armarium version
 ```
 
 In Docker, run them with `docker exec armarium /armarium <command>` (the image
-sets `ARMARIUM_CONFIG=/config/armarium.toml`).
+sets `ARMARIUM_CONFIG=/config/armarium.toml`). When Armarium refuses to start
+(for example over a library missing from the config), the container restarts in
+a loop and `docker exec` cannot reach it. Run the command in a one-off container
+of the same service instead, from the folder with `compose.yaml`:
+
+```sh
+docker compose run --rm armarium library list
+```
 
 ## Moving from Kavita
 
@@ -166,7 +173,10 @@ Back up the data folder (`armarium.db`) first, as for any upgrade. Then:
 
 - **Update the Skrivist readers first.** v0.5.0 numbers comic pages with files at
   the archive root (a cover) before chapter folders, and moves stored reading
-  positions and panel corrections to the new numbers once, at the first start.
+  positions and panel corrections to the new numbers at the first start. A comic
+  that cannot be opened then, or is missing, is renumbered at a later start or by
+  the scan that finds it again; positions and corrections saved after the upgrade
+  are never moved.
   Current Skrivist Books and Comics know about this (`pageOrder` on items); an old
   Comics that still remembers a page by its old number would write that number
   back the first time it opens such a comic. The hosted readers update on their
@@ -175,7 +185,8 @@ Back up the data folder (`armarium.db`) first, as for any upgrade. Then:
   first start; it keeps every id).
 - **A library missing from the config no longer deletes anything.** Armarium
   refuses to start and names it. Put it back, keep its items under a new name with
-  `armarium library rename OLD NEW`, or delete it with `armarium library rm NAME`.
+  `armarium library rename OLD NEW`, or delete it with `armarium library rm NAME`
+  (in Docker: `docker compose run --rm armarium library …`).
 - **Owner sessions end when `password_hash` changes.** The first start after the
   upgrade only records the current hash.
 - **`trusted_proxies`** lists reverse proxies whose `X-Forwarded-For` and
@@ -185,7 +196,8 @@ Back up the data folder (`armarium.db`) first, as for any upgrade. Then:
   ```toml
   trusted_proxies = ["172.17.0.1"]
   ```
-  Check it with `docker network inspect bridge`. Without it the cookie is Secure
+  Check it with `docker network inspect bridge`. `ARMARIUM_TRUSTED_PROXIES`
+  (comma-separated) overrides it. Without it the cookie is Secure
   only with `secure_cookie = true`, and every proxied visitor shares one login
   budget.
 - **Environment variables that override `armarium.toml` are logged.** The Docker

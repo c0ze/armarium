@@ -1,7 +1,8 @@
 # Armarium configuration. Every key is optional unless marked required.
 # Environment variables override the file: ARMARIUM_LISTEN, ARMARIUM_DATA_DIR,
-# ARMARIUM_PASSWORD_HASH, ARMARIUM_PUBLIC_URL, ARMARIUM_ALLOWED_HOSTS and
-# ARMARIUM_CORS_ORIGINS (the last two comma-separated). ARMARIUM_CONFIG names this file.
+# ARMARIUM_PASSWORD_HASH, ARMARIUM_PUBLIC_URL, ARMARIUM_ALLOWED_HOSTS,
+# ARMARIUM_CORS_ORIGINS and ARMARIUM_TRUSTED_PROXIES (the last three comma-separated).
+# ARMARIUM_CONFIG names this file.
 
 # Address to listen on. In Docker, use 0.0.0.0:8580.
 listen = "127.0.0.1:8580"
