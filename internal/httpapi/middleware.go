@@ -163,9 +163,13 @@ func (s *Server) writeAllowed(w http.ResponseWriter, r *http.Request, p Principa
 	case http.MethodGet, http.MethodHead, http.MethodOptions:
 		return true
 	}
-	if mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); mt != "application/json" {
-		writeError(w, http.StatusUnsupportedMediaType, "content type must be application/json")
-		return false
+	// A DELETE has no body: its route and Origin are the whole request. A
+	// cross-origin DELETE always needs a preflight, which only cors_origins pass.
+	if r.Method != http.MethodDelete || r.ContentLength != 0 {
+		if mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); mt != "application/json" {
+			writeError(w, http.StatusUnsupportedMediaType, "content type must be application/json")
+			return false
+		}
 	}
 	origin := r.Header.Get("Origin")
 	u, err := url.Parse(origin)

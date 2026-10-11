@@ -62,8 +62,14 @@
   async function revoke(t: Token) {
     if (confirmRevoke !== t.id) { confirmRevoke = t.id; return; }
     confirmRevoke = null;
-    await api.deleteToken(t.id);
-    tokens = await api.tokens();
+    error = '';
+    try {
+      await api.deleteToken(t.id);
+    } catch (e) {
+      error = (e as Error).message;
+    } finally {
+      tokens = await api.tokens();
+    }
   }
 
   const when = (s: number | null) => (s ? new Date(s * 1000).toLocaleString() : 'never');

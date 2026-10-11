@@ -115,11 +115,10 @@ export class ApiError extends Error {
 }
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const init: RequestInit = { method, credentials: 'same-origin', headers: {} };
-  if (body !== undefined) {
-    init.body = JSON.stringify(body);
-    (init.headers as Record<string, string>)['Content-Type'] = 'application/json';
-  }
+  // Every write declares JSON, bodyless DELETEs included: the server's CSRF
+  // check refuses any other content type.
+  const init: RequestInit = { method, credentials: 'same-origin', headers: method === 'GET' ? {} : { 'Content-Type': 'application/json' } };
+  if (body !== undefined) init.body = JSON.stringify(body);
   const res = await fetch(path, init);
   if (res.status === 204) return undefined as T;
   const data = await res.json().catch(() => ({}));

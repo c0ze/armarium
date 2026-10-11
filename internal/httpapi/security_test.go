@@ -276,3 +276,28 @@ func TestResourceTypeNeverEchoesDeclaredType(t *testing.T) {
 		}
 	}
 }
+
+func TestAdminRevokesTokens(t *testing.T) {
+	e := newEnv(t)
+	e.login()
+	create := func(name string) (int64, string) {
+		w := e.do(req{method: "POST", path: "/api/tokens", body: `{"name":"` + name + `"}`, cookie: true, origin: "https://armarium.test"})
+		v := decode[map[string]any](t, w)
+		return int64(v["token"].(map[string]any)["id"].(float64)), v["secret"].(string)
+	}
+	id, secret := create("phone")
+	// Exactly what Admin sends: no body and no Content-Type.
+	if w := e.do(req{method: "DELETE", path: fmt.Sprintf("/api/tokens/%d", id), cookie: true, origin: "https://armarium.test"}); w.Code != http.StatusNoContent {
+		t.Fatalf("revoke: %d %s", w.Code, w.Body)
+	}
+	if w := e.do(req{path: "/api/libraries", token: secret}); w.Code != http.StatusUnauthorized {
+		t.Fatalf("revoked token still works: %d", w.Code)
+	}
+	other, _ := create("tablet")
+	if w := e.do(req{method: "DELETE", path: fmt.Sprintf("/api/tokens/%d", other), cookie: true, origin: "https://evil.example"}); w.Code != http.StatusForbidden {
+		t.Fatalf("cross-site revoke: %d", w.Code)
+	}
+	if w := e.do(req{method: "DELETE", path: fmt.Sprintf("/api/tokens/%d", other), body: "x", ctype: "text/plain", cookie: true, origin: "https://armarium.test"}); w.Code != http.StatusUnsupportedMediaType {
+		t.Fatalf("DELETE with a non-JSON body: %d", w.Code)
+	}
+}

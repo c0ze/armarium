@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { fileUrl, formatSize, percent, query, readable, seriesOf, type Item } from './api';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { api, fileUrl, formatSize, percent, query, readable, seriesOf, type Item } from './api';
 
 const item = (page: number, pages: number, status: Item['progress']['status'] = 'reading') =>
   ({ pages, progress: { page, status, locator: '', updatedAt: 0 } }) as Item;
@@ -31,5 +31,15 @@ describe('api helpers', () => {
   it('formats sizes', () => {
     expect(formatSize(2048)).toBe('2 KB');
     expect(formatSize(5 * (1 << 20))).toBe('5.0 MB');
+  });
+});
+
+describe('api writes', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it('sends the JSON content type on a bodyless write, so revoking passes the CSRF check', async () => {
+    const fetch = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetch);
+    await api.deleteToken(7);
+    expect(fetch).toHaveBeenCalledWith('/api/tokens/7', expect.objectContaining({ method: 'DELETE', headers: { 'Content-Type': 'application/json' } }));
   });
 });
