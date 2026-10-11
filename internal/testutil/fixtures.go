@@ -57,12 +57,29 @@ func WriteZip(t testing.TB, dir, name string, entries ...Entry) string {
 // tool is needed: the format for stored files is small and fully specified.
 func WriteRAR(t testing.TB, dir, name string, entries ...Entry) string {
 	t.Helper()
+	return writeRAR(t, dir, name, false, entries...)
+}
+
+// WriteSolidRAR is WriteRAR with the solid flags set: on the archive, and on
+// every entry after the first, as rar -s writes them. The data stays stored, so
+// this exercises the solid code path, not dictionary sharing.
+func WriteSolidRAR(t testing.TB, dir, name string, entries ...Entry) string {
+	t.Helper()
+	return writeRAR(t, dir, name, true, entries...)
+}
+
+func writeRAR(t testing.TB, dir, name string, solid bool, entries ...Entry) string {
+	t.Helper()
 	p := filepath.Join(dir, name)
 	os.MkdirAll(filepath.Dir(p), 0o755)
 	var b bytes.Buffer
 	b.Write([]byte{0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x00}) // marker
-	writeRARBlock(&b, 0x73, 0, make([]byte, 6))               // archive header
-	for _, e := range entries {
+	var archiveFlags, entryFlags uint16
+	if solid {
+		archiveFlags, entryFlags = 0x0008, 0x0010 // MHD_SOLID, LHD_SOLID
+	}
+	writeRARBlock(&b, 0x73, archiveFlags, make([]byte, 6)) // archive header
+	for i, e := range entries {
 		var h bytes.Buffer
 		le := func(v any) { binary.Write(&h, binary.LittleEndian, v) }
 		le(uint32(len(e.Data)))        // packed size
@@ -75,7 +92,11 @@ func WriteRAR(t testing.TB, dir, name string, entries ...Entry) string {
 		le(uint16(len(e.Name)))        // name size
 		le(uint32(0o100644))           // attributes
 		h.WriteString(e.Name)
-		writeRARBlock(&b, 0x74, 0x8000, h.Bytes())
+		flags := uint16(0x8000)
+		if i > 0 {
+			flags |= entryFlags
+		}
+		writeRARBlock(&b, 0x74, flags, h.Bytes())
 		b.Write(e.Data)
 	}
 	writeRARBlock(&b, 0x7b, 0x4000, nil) // end of archive

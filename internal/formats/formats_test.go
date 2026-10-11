@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nwaples/rardecode/v2"
+
 	tu "github.com/c0ze/armarium/internal/testutil"
 )
 
@@ -205,5 +207,30 @@ func TestRootPagesComeFirst(t *testing.T) {
 			t.Fatalf("%s: page 1 is not the cover", filepath.Base(p))
 		}
 		c.Close()
+	}
+}
+
+// Every entry of a solid archive after the first depends on those before it,
+// so rardecode cannot open one on its own: such pages are read sequentially.
+func TestSolidRARPages(t *testing.T) {
+	p := tu.WriteSolidRAR(t, t.TempDir(), "solid.cbr", comicEntries()...)
+	rfs, err := rardecode.OpenFS(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rfs.Open("page1.png"); !errors.Is(err, rardecode.ErrSolidOpen) {
+		t.Fatalf("the fixture must be solid for rardecode: %v", err)
+	}
+	c, err := Open(p, "cbr", lim)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	want := map[int][]byte{0: tu.PNG(2, 2, 1), 1: []byte("jpeg-2"), 2: tu.PNG(2, 2, 10)}
+	// Forwards, then a page behind the reader, which starts it over.
+	for _, i := range []int{1, 0, 2, 1} {
+		if b, _ := pageBytes(t, c, i); !bytes.Equal(b, want[i]) {
+			t.Fatalf("page %d: %q", i+1, b)
+		}
 	}
 }
