@@ -76,6 +76,9 @@ phone's camera. Admin warns when `public_url` is missing, points at this compute
 or a reader's origin is missing from `cors_origins`, and refuses to pair over plain
 HTTP. More in [clients.md](clients.md#pairing-a-phone).
 
+The Mac and Windows apps pair from **Admin → This computer** instead, and can use
+plain HTTP on your network ([clients.md](clients.md#pairing-this-computer)).
+
 This list also supports Skrivist Books and Comics on macOS and Windows and is
 included in the example configuration from v0.3.2. Existing installations must
 add the desktop origins to their own `cors_origins` and restart after upgrading;
@@ -120,6 +123,9 @@ armarium serve                    run the server (default)
 armarium scan [library]           scan once and exit
 armarium token add <name>         create an API token (printed once)
 armarium token list | rm <name>
+armarium library list             libraries in the database, configured or not
+armarium library rename <old> <new>   keep a library's items under a new name
+armarium library rm <name>        delete a library with its items and progress
 armarium hash-password            argon2id hash of a password read from stdin
 armarium import-kavita --db kavita.db --library <name> --root <path Kavita saw>
 armarium import-skrivist --db reader_index.db --library <name>
@@ -146,5 +152,43 @@ Try it on a copy first; the importer reads Kavita's `AppUserProgresses`,
 - Every request except `/healthz` needs the owner session or an API token.
 - `allowed_hosts` must list the names you use; anything else gets `421`.
 - Serve over HTTPS if Armarium is reachable from outside your network, and set
-  `secure_cookie = true`.
+  `secure_cookie = true`. Behind a reverse proxy, also list it in
+  `trusted_proxies` (below): the cookie is then Secure for visitors who came over
+  HTTPS even with `secure_cookie = false`, and login limits count each visitor.
+- Five login attempts a minute are allowed per client (30 in all). Without
+  `trusted_proxies`, everyone behind the proxy counts as one client.
+- Changing `password_hash` logs out every owner session at the next start.
 - Tokens are shown once and stored hashed. Revoke them from **Admin**.
+
+## Upgrading to v0.5.0
+
+Back up the data folder (`armarium.db`) first, as for any upgrade. Then:
+
+- **Update the Skrivist readers first.** v0.5.0 numbers comic pages with files at
+  the archive root (a cover) before chapter folders, and moves stored reading
+  positions and panel corrections to the new numbers once, at the first start.
+  Current Skrivist Books and Comics know about this (`pageOrder` on items); an old
+  Comics that still remembers a page by its old number would write that number
+  back the first time it opens such a comic. The hosted readers update on their
+  own; update the Mac and Windows apps before upgrading Armarium.
+- **Item and series ids are now never reused** (a one-time table rebuild at the
+  first start; it keeps every id).
+- **A library missing from the config no longer deletes anything.** Armarium
+  refuses to start and names it. Put it back, keep its items under a new name with
+  `armarium library rename OLD NEW`, or delete it with `armarium library rm NAME`.
+- **Owner sessions end when `password_hash` changes.** The first start after the
+  upgrade only records the current hash.
+- **`trusted_proxies`** lists reverse proxies whose `X-Forwarded-For` and
+  `X-Forwarded-Proto` Armarium believes. On a Synology NAS with Armarium in
+  Container Manager behind the DSM reverse proxy, that is the Docker bridge
+  gateway, usually:
+  ```toml
+  trusted_proxies = ["172.17.0.1"]
+  ```
+  Check it with `docker network inspect bridge`. Without it the cookie is Secure
+  only with `secure_cookie = true`, and every proxied visitor shares one login
+  budget.
+- **Environment variables that override `armarium.toml` are logged.** The Docker
+  image sets `ARMARIUM_LISTEN` and `ARMARIUM_DATA_DIR`, which win over the file.
+- **`cors_origins` entries are normalised** to the form browsers send (no trailing
+  slash, lower case, no default port); an entry with a path is an error.

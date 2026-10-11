@@ -38,13 +38,15 @@ Keep files under ~300 lines, one responsibility each.
 
 ```go
 type Container interface {
-    Pages() int                             // comics: image entries in natural sort order
+    Pages() int                             // comics: image entries in page order
     Page(i int) (io.ReadCloser, string, error) // stream + media type
+    Name(i int) string                      // the entry name, for clients matching their own pages
     Close() error
 }
 ```
 
-- **CBZ:** `archive/zip`. Image entries are sorted by natural order (`page2` < `page10`), and `__MACOSX` and dotfiles are ignored. Pages stream straight from the zip entry with no temp files.
+- **Page order:** files at the archive root first (a cover), then deeper folders, each by natural order (`page2` < `page10`). Before v0.5.0 the root came last in natural order; stored page numbers were remapped once (`scan.RemapPageOrder`), and items report `pageOrder: 2`.
+- **CBZ:** `archive/zip`. Image entries are sorted in page order, and `__MACOSX` and dotfiles are ignored. Pages stream straight from the zip entry with no temp files.
 - **CBR:** `github.com/nwaples/rardecode/v2` (pure Go). RAR has no random access, so page N means reading forward. rardecode's `RarFS` indexes the file headers once, so a page seeks straight to its entry in non-solid archives, and an LRU of recently opened archives keeps page turns fast. In a solid archive every entry after the first depends on those before it, so those pages come from a sequential reader kept open after the last page read: reading forwards decodes each entry once, and going back starts it over. The decoder dictionary is capped at 32 MiB.
 - **EPUB:** `archive/zip` plus our own OPF/NCX/nav parsing (small; the existing Python `reader/epub.py` is a good reference for behaviour, not code). Chapters are sanitized before serving (§7).
 - **Download-only formats** (MOBI, AZW3, AZW, FB2, DjVu, plus whatever a Calibre library holds): listed, served as files, never opened.
@@ -102,13 +104,13 @@ are ignored in SQL and reported as `applied: false`.
 ## 6. OPDS and PanelFlow
 
 - `/opds/v1.2/catalog` → libraries → series (paged navigation feeds) → items (acquisition feed), plus "Continue reading", "Recently added" and search. Each comic entry carries a PSE link `…/items/{id}/pse/{pageNumber}` (0-based, per the PSE spec) with `pse:count` and `pse:lastRead`.
-- **Auth for OPDS:** HTTP Basic (any username, token as password), `?token=`, or the token in the path: `/opds/t/{token}/v1.2/catalog`. Every link keeps the request's prefix, so path-token clients never lose it. Tokens are stored hashed (SHA-256 of a 256-bit secret) and never logged.
+- **Auth for OPDS:** HTTP Basic (any username, token as password), a Bearer header, or the token in the path: `/opds/t/{token}/v1.2/catalog`. Every link keeps the request's prefix, so path-token clients never lose it. `?token=` authenticates a single request; links never carry it. Tokens are stored hashed (SHA-256 of a 256-bit secret) and never logged.
 - Feed-level links come before entries and the first `rel="search"` is a direct `{searchTerms}` template (skrivist.app's parser needs both). See [clients.md](clients.md).
 - **PanelFlow integration.** PanelFlow (and comics.skriv.ist, which shares its frontend) now has an **Armarium mode** on the JSON API above, so no Kavita shim was built. Browser readers call Armarium directly; `cors_origins` lists their origins (no credentials, preflight answered before auth).
 
 ## 7. Security
 
-- **Middleware order:** limits (body size, header timeout, `ReadHeaderTimeout`/`ReadTimeout`) → Host allowlist → CORS (configured reader origins only) → per-route guard: auth (session cookie or token) and access level (reader / owner-only admin) → CSRF (on non-GET: `Content-Type: application/json`; ambient credentials, i.e. the cookie or Basic, need an `Origin` of our own hosts; explicit tokens may come from a `cors_origins` origin) → handler.
+- **Middleware order:** limits (body size, header timeout, `ReadHeaderTimeout`/`ReadTimeout`) → CORS (configured reader origins only; a preflight is answered before the Host check, which reveals nothing, so a reader can read the 421 an unknown host gets) → Host allowlist → per-route guard: auth (session cookie or token) and access level (reader / owner-only admin) → CSRF (on non-GET: `Content-Type: application/json`; ambient credentials, i.e. the cookie or Basic, need an `Origin` of our own hosts; explicit tokens may come from a `cors_origins` origin) → handler.
 - **Session:** a single password (argon2id hash in config) gives an HttpOnly, SameSite=Strict, Secure (when served over TLS) cookie.
 - **Untrusted content:** the EPUB sanitizer is an allowlist on `golang.org/x/net/html` tokens. It drops `script`, `svg`, `math`, `iframe`, `object`, `form` and every `on*` attribute, and it drops `srcset` and any URL that isn't a same-book resource. A book's own `<style>` blocks and `style` attributes are kept (code listings and Sigil formatting depend on them), with every `url()` pinned to the book. `/read/*` responses carry `Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'` and `nosniff`: with no script and every fetch limited to `'self'`, CSS cannot reach anything outside the server. The UI shows chapters in a sandboxed iframe as a second layer.
 - **Decompression caps:** a maximum uncompressed entry size (e.g. 64 MiB), maximum image dimensions checked with `image.DecodeConfig` before any decode, and a maximum entries per archive.

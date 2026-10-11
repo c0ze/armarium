@@ -36,6 +36,11 @@ cors_origins = [
 # Mark the session cookie Secure. Set to true when served over HTTPS.
 secure_cookie = false
 
+# Reverse proxies (IPs or CIDRs) whose X-Forwarded-For and X-Forwarded-Proto are
+# believed: login limits then count each visitor, and the session cookie is Secure
+# for HTTPS visitors. On Docker, the bridge gateway (docker network inspect bridge).
+# trusted_proxies = ["127.0.0.1", "172.17.0.1"]
+
 # Optional: where PanelFlow is served; comic pages then offer "Open in PanelFlow".
 # panelflow_url = "https://example.com/comics"
 

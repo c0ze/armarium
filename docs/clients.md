@@ -37,15 +37,28 @@ one without the others.
   readers refuse plain-HTTP catalogues, so Admin won't pair over HTTP.
 - Add the reader origins to `cors_origins` (`https://comics.skriv.ist`,
   `https://books.skriv.ist`): the readers fetch the catalogue from the browser.
+  Entries are matched as a browser sends them; Armarium normalises case, default
+  ports and a trailing slash, and refuses entries with a path.
 - The phone itself must reach `public_url`. If Armarium is only on your home network
   or a VPN such as Tailscale, the phone has to be on it too, and its DNS has to give
   an address the phone can reach. A QR that opens the reader but then spins on
   Connect almost always means the phone can't reach the server.
 - The QR carries the token in the link's fragment, which never reaches the reader's
-  server. Once paired, OPDS requests carry it in the path, as any token-in-path client
-  does, so a reverse proxy's access log will contain it.
+  server. After Connect the readers send it as an `Authorization: Bearer` header to
+  the plain `/opds/v1.2/…` URLs and keep it apart from every URL they store, so it
+  does not end up in a proxy's access log. (Generic token-in-path OPDS apps still
+  put it in the path.)
 - To unpair, revoke the token under API tokens, then forget the shelf on the phone.
   Revoking stops access; it doesn't delete books already downloaded.
+
+### Pairing this computer
+
+The **This computer** section of the same panel pairs the Skrivist Books and
+Comics apps for Mac and Windows. It creates a token named like
+`books-desktop-2026-10-11-0930` and an `skrivist-books://pair#opds=…` link: open it
+on this computer (or paste it into the app's catalogue field), then press Connect
+in the app. The desktop apps can use plain HTTP on your network, so this works
+without `public_url` or HTTPS.
 
 ## PanelFlow and comics.skriv.ist
 
@@ -81,11 +94,23 @@ Do not add `*`, `null`, other custom schemes, or a trailing slash.
 Origins are matched exactly. Both apps still need an API token; CORS does not
 grant authentication or permit cookies.
 
-In Comics, enter the server's base URL and the token in **Armarium**. In Books,
-use **Catalogues** with `https://<host>/opds/v1.2/catalog`, any nonempty username,
-and the token as the password. The allowlist covers library requests, downloads,
-page images and Comics progress writes. Existing desktop builds need no update
-for this server-side fix.
+Pair from Admin (above), or connect by hand. In Comics, enter the server's base
+URL and the token in **Armarium**. In either app, a token URL pasted as the
+catalogue, `http(s)://<host>/opds/t/<token>/v1.2/catalog`, connects and keeps the
+token on the device (it moves out of the URL on Connect); a Basic password
+(any username, the token as password) works too but lasts only for that session.
+The allowlist covers library requests, downloads, page images, Comics progress
+and panel writes.
+
+- **HTTP on your network works.** The macOS app's origin is `tauri://localhost`,
+  the Windows app's `http://tauri.localhost`; neither is an HTTPS page, so a
+  `http://192.168.x.x:8580` server is fine. Its address must be in
+  `allowed_hosts`, and `listen` must not be `127.0.0.1` for other machines.
+- **HTTP 421** ("unknown host") means the host name or address the app used is
+  not in `allowed_hosts`. The apps show it as such.
+- **macOS 15 and later** ask once whether Skrivist may find devices on your local
+  network. If that was declined, allow it under System Settings › Privacy &
+  Security › Local Network.
 
 To diagnose a rejected preflight without exposing a token:
 
@@ -110,7 +135,9 @@ public HTTPS host name.
 
 ## JSON API
 
-For your own tools; authenticate with `Authorization: Bearer <token>`.
+For your own tools; authenticate with `Authorization: Bearer <token>`. A
+`?token=` query parameter also authenticates a single request, but feed links
+never carry it, so OPDS clients use Basic, Bearer or the path form instead.
 
 ```text
 GET  /api/libraries
@@ -119,6 +146,7 @@ GET  /api/series/{id}                    series + items in reading order
 GET  /api/items?library=&series=&q=&status=&tag=&source=&sort=&offset=&limit=
 GET  /api/items/{id}                     item (with progress) + library
 GET  /api/items/{id}/cover               JPEG thumbnail
+GET  /api/items/{id}/pages               comic page names in reading order
 GET  /api/items/{id}/pages/{n}           comic page n (1-based)
 GET  /api/items/{id}/pages/{n}/panels    shared correction or null
 PUT  /api/items/{id}/pages/{n}/panels    save shared panels with expected revision
@@ -135,9 +163,17 @@ you send `"reset": true`; `{"status": "unread"}` resets it. Details in
 
 Clients supporting the panel editor can save geometry and reading order once on
 Armarium and reuse it on other devices. Corrections belong to the comic page,
-not a token or account. Any authenticated reader may edit them. Generic OPDS
+not a token or account. Any reader with a Bearer token may edit them (Basic
+credentials are read-only from other origins, as for every write). Generic OPDS
 clients continue reading normally; they must implement this API to use panels.
-Skrivist Comics uses it for streaming and Armarium OPDS downloads/phone pairing.
+Skrivist Comics uses it for streaming and for CBZ/CBR downloaded over OPDS.
+
+Page numbers follow Armarium's page order: pages at the archive root (a cover)
+first, then chapter folders, each in natural order. A client that unpacked the
+file itself matches its pages to these numbers by entry name with
+`GET /api/items/{id}/pages`, which lists `{"name": …}` in order. Items report
+`"pageOrder": 2`; numbers stored before v0.5.0 (root files last) were remapped
+once at upgrade.
 
 `GET /api/items/{id}/pages/{n}/panels` returns `{"correction": null}` when there
 is no record, otherwise a correction object. Responses are authenticated and
@@ -161,11 +197,15 @@ A PUT sends this shape (`rect` is normalized X, Y, width, height):
 
 Array order is the explicit reading order; IDs must be unique nonnegative
 integers. Up to 100 edited panels are allowed, each inside the page and at least
-0.5% wide/high. Geometry, bounds and body size are validated. The server hashes
-the original page before accepting the annotation; images are not uploaded.
+0.5% wide/high. Geometry and bounds are validated, and a body may be up to
+256 KiB (the largest valid correction is about 100 KiB); a larger one gets
+HTTP 413. The server hashes the original page before accepting the annotation;
+images are not uploaded.
 
 Revision 0 creates a record. Later saves send the revision returned by GET;
-successful writes increment it and set `updatedAt` (Unix seconds). HTTP 409 means
+successful writes increment it and set `updatedAt` (Unix seconds).
+Progress `updatedAt` likewise grows with every applied write, even within one
+second, so clients can compare it to tell which side changed last. HTTP 409 means
 the page bytes changed or a newer correction exists: reload before editing.
 This compare-and-swap is atomic, so stale clients cannot erase a newer edit.
 `enabled:true` with an empty panel array means intentional whole-page reading.
