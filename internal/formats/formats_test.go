@@ -297,3 +297,38 @@ func TestOversizedSolidEntriesStayUnderTheDecoderCap(t *testing.T) {
 		t.Fatalf("%d solid decoders open, cap %d", live, maxLiveSolid)
 	}
 }
+
+// Requests still reading cannot be evicted, so the request that finishes last trims
+// the decoders back to the cap: none stays above it once reads are done.
+func TestSolidDecoderCapHoldsAfterConcurrentReads(t *testing.T) {
+	dir := t.TempDir()
+	var open []*rarContainer
+	for i := range maxLiveSolid + 1 {
+		c, err := Open(tu.WriteSolidRAR(t, dir, fmt.Sprintf("busy%d.cbr", i), comicEntries()...), "cbr", lim)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer c.Close()
+		open = append(open, c.(*rarContainer))
+	}
+	a, b, c := open[0], open[1], open[2]
+	pageBytes(t, a, 1)
+	pageBytes(t, b, 1)
+	// a and b are still inside their reads (holding their locks) when c reads.
+	a.mu.Lock()
+	b.mu.Lock()
+	pageBytes(t, c, 1)
+	a.mu.Unlock()
+	b.mu.Unlock()
+	live := 0
+	for _, x := range open {
+		x.mu.Lock()
+		if x.seq != nil {
+			live++
+		}
+		x.mu.Unlock()
+	}
+	if live > maxLiveSolid {
+		t.Fatalf("%d solid decoders open after the reads, cap %d", live, maxLiveSolid)
+	}
+}

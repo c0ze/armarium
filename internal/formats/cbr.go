@@ -32,24 +32,33 @@ var solid struct {
 }
 
 // keepSeq records c, which holds c.mu and an open sequential reader, as the
-// most recent solid decoder and closes the least recently used beyond the cap.
-// A container busy reading is not idle: it stays open and first in line.
+// most recent solid decoder. Closing the ones beyond the cap waits for trimSeqs.
 func keepSeq(c *rarContainer) {
 	solid.Lock()
 	solid.live = append(slices.DeleteFunc(solid.live, func(o *rarContainer) bool { return o == c }), c)
-	var over []*rarContainer
-	for len(solid.live) > maxLiveSolid {
-		over, solid.live = append(over, solid.live[0]), solid.live[1:]
-	}
 	solid.Unlock()
-	for _, o := range over {
-		if !o.mu.TryLock() { // never wait on another container while holding c.mu
-			solid.Lock()
-			solid.live = append([]*rarContainer{o}, solid.live...)
-			solid.Unlock()
+}
+
+// trimSeqs closes the least recently used solid decoders beyond the cap. It runs
+// after every read, with no container lock held. A container still reading is
+// skipped; the read that finishes last trims what is left, so once reads are
+// done no more than maxLiveSolid decoders stay open.
+func trimSeqs() {
+	solid.Lock()
+	live := slices.Clone(solid.live)
+	solid.Unlock()
+	excess := len(live) - maxLiveSolid
+	for _, o := range live {
+		if excess <= 0 {
+			return
+		}
+		if !o.mu.TryLock() { // reading now
 			continue
 		}
-		o.closeSeq()
+		if o.seq != nil {
+			o.closeSeq()
+			excess--
+		}
 		o.mu.Unlock()
 	}
 }
@@ -102,9 +111,16 @@ func (c *rarContainer) Pages() int { return len(c.pages) }
 
 func (c *rarContainer) Name(i int) string { return c.pages[i] }
 
-// Page reads the whole entry under the lock (pages are a few MiB, capped by
-// MaxEntryBytes) so concurrent requests never interleave on the shared decoder.
+// Page reads one page, then closes the solid decoders beyond the cap.
 func (c *rarContainer) Page(i int) (io.ReadCloser, string, error) {
+	rc, typ, err := c.read(i)
+	trimSeqs() // after c.mu is released, so no container waits on another
+	return rc, typ, err
+}
+
+// read reads the whole entry under the lock (pages are a few MiB, capped by
+// MaxEntryBytes) so concurrent requests never interleave on the shared decoder.
+func (c *rarContainer) read(i int) (io.ReadCloser, string, error) {
 	if i < 0 || i >= len(c.pages) {
 		return nil, "", ErrNoPage
 	}
