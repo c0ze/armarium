@@ -181,3 +181,36 @@ func TestTrustedProxies(t *testing.T) {
 		t.Fatalf("env override: %v", c.TrustedProxies)
 	}
 }
+
+func TestCORSOriginsAreCanonical(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "armarium.toml")
+	os.WriteFile(p, []byte(`cors_origins = ["HTTPS://Books.Skriv.Ist/", "https://comics.skriv.ist:443", "TAURI://localhost", "http://[::1]:8080"]`), 0o600)
+	c, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"https://books.skriv.ist", "https://comics.skriv.ist", "tauri://localhost", "http://[::1]:8080"}
+	if !slices.Equal(c.CORSOrigins, want) {
+		t.Fatalf("got %v, want %v", c.CORSOrigins, want)
+	}
+	for _, bad := range []string{"https://books.skriv.ist/app", "https://x.example?y", "https://u@x.example", "https://x.example#f"} {
+		os.WriteFile(p, []byte(`cors_origins = ["`+bad+`"]`), 0o600)
+		if _, err := Load(p); err == nil {
+			t.Errorf("%q must be rejected: a browser Origin never has a path, query, fragment or user", bad)
+		}
+	}
+}
+
+func TestEnvironmentOverridesAreReported(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "armarium.toml")
+	os.WriteFile(p, []byte("listen = \"0.0.0.0:9000\"\n"), 0o600)
+	t.Setenv("ARMARIUM_LISTEN", "127.0.0.1:1")
+	t.Setenv("ARMARIUM_DATA_DIR", "/data") // not in the file: an override of a default, not of the file
+	c, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Listen != "127.0.0.1:1" || !slices.Equal(c.Overrides, []string{"listen"}) {
+		t.Fatalf("listen %q, overrides %v", c.Listen, c.Overrides)
+	}
+}

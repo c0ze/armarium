@@ -62,6 +62,10 @@ type Config struct {
 	Libraries    []Library `toml:"library"`
 	Scan         Scan      `toml:"scan"`
 	Limits       Limits    `toml:"limits"`
+	// Overrides lists keys set in the file that an ARMARIUM_* variable replaced.
+	// The Docker image sets ARMARIUM_LISTEN and ARMARIUM_DATA_DIR, so a listen
+	// in armarium.toml would otherwise be ignored without a word.
+	Overrides []string `toml:"-"`
 }
 
 func Default() Config {
@@ -84,37 +88,33 @@ func Default() Config {
 // Load reads path (if non-empty) over the defaults, then env overrides, then validates.
 func Load(path string) (Config, error) {
 	c := Default()
+	var md toml.MetaData
 	if path != "" {
-		if _, err := toml.DecodeFile(path, &c); err != nil {
+		var err error
+		if md, err = toml.DecodeFile(path, &c); err != nil {
 			return c, fmt.Errorf("config %s: %w", path, err)
 		}
 	}
-	applyEnv(&c)
+	applyEnv(&c, md)
 	return c, c.validate()
 }
 
-func applyEnv(c *Config) {
-	if v := os.Getenv("ARMARIUM_LISTEN"); v != "" {
-		c.Listen = v
+func applyEnv(c *Config, md toml.MetaData) {
+	set := func(env, key string, apply func(string)) {
+		if v := os.Getenv(env); v != "" {
+			apply(v)
+			if md.IsDefined(key) {
+				c.Overrides = append(c.Overrides, key)
+			}
+		}
 	}
-	if v := os.Getenv("ARMARIUM_DATA_DIR"); v != "" {
-		c.DataDir = v
-	}
-	if v := os.Getenv("ARMARIUM_PASSWORD_HASH"); v != "" {
-		c.PasswordHash = v
-	}
-	if v := os.Getenv("ARMARIUM_ALLOWED_HOSTS"); v != "" {
-		c.AllowedHosts = splitList(v)
-	}
-	if v := os.Getenv("ARMARIUM_PUBLIC_URL"); v != "" {
-		c.PublicURL = v
-	}
-	if v := os.Getenv("ARMARIUM_CORS_ORIGINS"); v != "" {
-		c.CORSOrigins = splitList(v)
-	}
-	if v := os.Getenv("ARMARIUM_TRUSTED_PROXIES"); v != "" {
-		c.TrustedProxies = splitList(v)
-	}
+	set("ARMARIUM_LISTEN", "listen", func(v string) { c.Listen = v })
+	set("ARMARIUM_DATA_DIR", "data_dir", func(v string) { c.DataDir = v })
+	set("ARMARIUM_PASSWORD_HASH", "password_hash", func(v string) { c.PasswordHash = v })
+	set("ARMARIUM_ALLOWED_HOSTS", "allowed_hosts", func(v string) { c.AllowedHosts = splitList(v) })
+	set("ARMARIUM_PUBLIC_URL", "public_url", func(v string) { c.PublicURL = v })
+	set("ARMARIUM_CORS_ORIGINS", "cors_origins", func(v string) { c.CORSOrigins = splitList(v) })
+	set("ARMARIUM_TRUSTED_PROXIES", "trusted_proxies", func(v string) { c.TrustedProxies = splitList(v) })
 }
 
 func splitList(v string) []string {
@@ -147,12 +147,14 @@ func (c *Config) validate() error {
 	if pub != "" && !HostAllowed(c.AllowedHosts, strings.SplitN(pub, "://", 2)[1]) {
 		return fmt.Errorf("%w (public_url %q, allowed_hosts %q)", errPublicHost, pub, c.AllowedHosts)
 	}
-	for _, o := range c.CORSOrigins {
-		// Tauri's macOS webview uses this exact custom-scheme origin. Other
-		// custom schemes and opaque (null) origins must remain disallowed.
-		if o != "tauri://localhost" && !strings.HasPrefix(o, "http://") && !strings.HasPrefix(o, "https://") {
-			return fmt.Errorf("cors_origins entry %q must be an http(s) origin or tauri://localhost", o)
+	// Browsers send an exact Origin, so each entry is stored in that form: an
+	// entry with a trailing slash or upper case would otherwise never match.
+	for i, o := range c.CORSOrigins {
+		canon, err := canonicalOrigin(o)
+		if err != nil {
+			return err
 		}
+		c.CORSOrigins[i] = canon
 	}
 	seen := map[string]bool{}
 	for i := range c.Libraries {

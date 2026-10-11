@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -120,6 +121,9 @@ func open(cfgPath string, log *slog.Logger, sync bool) (*app, error) {
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
 		return nil, err
+	}
+	if len(cfg.Overrides) > 0 {
+		log.Warn("environment overrides armarium.toml", "keys", strings.Join(cfg.Overrides, ", "))
 	}
 	if err := os.MkdirAll(cfg.DataDir, 0o755); err != nil {
 		return nil, err
