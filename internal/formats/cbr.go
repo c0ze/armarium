@@ -174,6 +174,7 @@ func (c *rarContainer) solidEntry(name string) ([]byte, error) {
 				limit = math.MaxInt64 - 1
 			}
 			if h.UnPackedSize > limit {
+				keepSeq(c) // the decoder stays open for later pages, so it counts toward the cap
 				return nil, ErrTooLarge
 			}
 			b, err := io.ReadAll(io.LimitReader(c.seq, limit+1))
@@ -181,10 +182,10 @@ func (c *rarContainer) solidEntry(name string) ([]byte, error) {
 				c.closeSeq()
 				return nil, err
 			}
+			keepSeq(c)
 			if int64(len(b)) > limit {
 				return nil, ErrTooLarge
 			}
-			keepSeq(c)
 			return b, nil
 		}
 		c.closeSeq() // the page is behind the reader: start over once

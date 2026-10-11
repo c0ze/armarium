@@ -268,3 +268,32 @@ func TestSolidDecodersStayFewAcrossComics(t *testing.T) {
 		t.Fatal("the cap must follow the most recent reads")
 	}
 }
+
+// A solid entry over the size limit fails, but its decoder still counts toward the cap.
+func TestOversizedSolidEntriesStayUnderTheDecoderCap(t *testing.T) {
+	dir := t.TempDir()
+	small := Limits{MaxEntryBytes: 4, MaxEntries: 100}
+	var open []*rarContainer
+	for i := range maxLiveSolid + 1 {
+		c, err := Open(tu.WriteSolidRAR(t, dir, fmt.Sprintf("big%d.cbr", i), comicEntries()...), "cbr", small)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer c.Close()
+		if _, _, err := c.Page(0); !errors.Is(err, ErrTooLarge) { // page1.png, a solid entry
+			t.Fatalf("page 1: %v, want ErrTooLarge", err)
+		}
+		open = append(open, c.(*rarContainer))
+	}
+	live := 0
+	for _, c := range open {
+		c.mu.Lock()
+		if c.seq != nil {
+			live++
+		}
+		c.mu.Unlock()
+	}
+	if live > maxLiveSolid {
+		t.Fatalf("%d solid decoders open, cap %d", live, maxLiveSolid)
+	}
+}
