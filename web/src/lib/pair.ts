@@ -1,6 +1,7 @@
-// Pairing a phone: the link a QR code carries and the QR itself. The link is
-// <reader>/#opds=<catalogue>, which comics.skriv.ist and books.skriv.ist read on
-// startup; the token rides in the fragment, so it never reaches the reader's host.
+// Pairing a phone or the desktop apps: the link (and for phones the QR code that
+// carries it). The link is <reader>/#opds=<catalogue>, which comics.skriv.ist and
+// books.skriv.ist read on startup, or skrivist-<app>://pair#opds=<catalogue> for the
+// desktop apps; the token rides in the fragment, so it never reaches a reader's host.
 import qrcode from 'qrcode-generator';
 import { ApiError, type Token } from './api';
 
@@ -8,8 +9,14 @@ const trimSlash = (s: string) => s.replace(/\/$/, '');
 
 export function pairLink(readerUrl: string, base: string, secret: string): string {
   const catalogue = `${trimSlash(base)}/opds/t/${secret}/v1.2/catalog`;
-  return `${trimSlash(readerUrl)}/#opds=${encodeURIComponent(catalogue)}`;
+  // The desktop apps' own link (skrivist-books://pair) takes the fragment directly.
+  const reader = readerUrl.includes('://pair') ? readerUrl : `${trimSlash(readerUrl)}/`;
+  return `${reader}#opds=${encodeURIComponent(catalogue)}`;
 }
+
+/** Phones open the hosted readers, which only load HTTPS catalogues; the desktop
+ * apps can use plain HTTP on the local network. */
+export const canPair = (reader: { desktop?: boolean }, plainHttp: boolean) => !!reader.desktop || !plainHttp;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 

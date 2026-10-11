@@ -28,13 +28,24 @@ func TestPairPayload(t *testing.T) {
 		"publicUrl": "",
 		"readers": []any{
 			map[string]any{"id": "comics", "name": "Skrivist Comics", "url": "https://comics.skriv.ist",
-				"origin": "https://comics.skriv.ist", "corsAllowed": true},
+				"origin": "https://comics.skriv.ist", "corsAllowed": true, "desktop": false, "missing": []any{}},
 			map[string]any{"id": "books", "name": "Skrivist Books", "url": "https://books.skriv.ist",
-				"origin": "https://books.skriv.ist", "corsAllowed": false},
+				"origin": "https://books.skriv.ist", "corsAllowed": false, "desktop": false, "missing": []any{"https://books.skriv.ist"}},
+			map[string]any{"id": "comics-desktop", "name": "Skrivist Comics for Mac and Windows", "url": "skrivist-comics://pair",
+				"origin": "", "corsAllowed": false, "desktop": true, "missing": []any{"tauri://localhost", "http://tauri.localhost"}},
+			map[string]any{"id": "books-desktop", "name": "Skrivist Books for Mac and Windows", "url": "skrivist-books://pair",
+				"origin": "", "corsAllowed": false, "desktop": true, "missing": []any{"tauri://localhost", "http://tauri.localhost"}},
 		},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %#v\nwant %#v", got, want)
+	}
+	// Either Windows origin counts: https://tauri.localhost is the useHttpsScheme variant.
+	e.srv.Cfg.CORSOrigins = append(e.srv.Cfg.CORSOrigins, "tauri://localhost", "https://tauri.localhost")
+	for _, r := range decode[pairInfo](t, e.do(req{path: "/api/pair", cookie: true})).Readers {
+		if r.Desktop && (!r.CORSAllowed || len(r.Missing) != 0) {
+			t.Errorf("%s with both desktop origins: %+v", r.ID, r)
+		}
 	}
 }
 

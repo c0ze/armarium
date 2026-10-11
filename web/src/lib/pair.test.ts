@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import qrcode from 'qrcode-generator';
 import { ApiError, type Token } from './api';
-import { createPairToken, deviceSlug, isLoopback, pairLink, pairTokenName, qrPath, readDeviceChoice } from './pair';
+import { canPair, createPairToken, deviceSlug, isLoopback, pairLink, pairTokenName, qrPath, readDeviceChoice } from './pair';
 
 const secret = 'Ab-_' + 'x'.repeat(39);
 
@@ -13,6 +13,23 @@ describe('pairLink', () => {
     expect(new URLSearchParams(link.split('#')[1]).get('opds')).toBe(
       `https://armarium.example/opds/t/${secret}/v1.2/catalog`,
     );
+  });
+});
+
+describe('desktop pairing', () => {
+  it('opens the desktop app with the catalogue in its fragment', () => {
+    expect(pairLink('skrivist-books://pair', 'http://192.168.1.5:8580', 's3cr3t')).toBe(
+      'skrivist-books://pair#opds=' + encodeURIComponent('http://192.168.1.5:8580/opds/t/s3cr3t/v1.2/catalog'),
+    );
+    expect(pairLink('https://comics.skriv.ist', 'https://a.example', 's3cr3t')).toBe(
+      'https://comics.skriv.ist/#opds=' + encodeURIComponent('https://a.example/opds/t/s3cr3t/v1.2/catalog'),
+    );
+  });
+
+  it('allows plain HTTP for the desktop apps only: phones open the HTTPS readers', () => {
+    expect(canPair({ desktop: true }, true)).toBe(true);
+    expect(canPair({ desktop: false }, true)).toBe(false);
+    expect(canPair({}, false)).toBe(true);
   });
 });
 

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api, type PairInfo, type PairReader } from '../lib/api';
-  import { DEVICES, createPairToken, deviceSlug, isLoopback, pairLink, qrPath, readDeviceChoice } from '../lib/pair';
+  import { DEVICES, canPair, createPairToken, deviceSlug, isLoopback, pairLink, qrPath, readDeviceChoice } from '../lib/pair';
 
   let { onchange }: { onchange: () => void | Promise<void> } = $props();
 
@@ -37,6 +37,18 @@
   // Without public_url the QR points at the address this page was loaded from.
   const base = $derived(info?.publicUrl || location.origin);
   const plainHttp = $derived(base.startsWith('http:'));
+  const phones = $derived(info?.readers.filter((r) => !r.desktop) ?? []);
+  const computers = $derived(info?.readers.filter((r) => r.desktop) ?? []);
+  let copied = $state(false);
+
+  async function copy(link: string) {
+    try {
+      await navigator.clipboard.writeText(link);
+      copied = true;
+    } catch {
+      copied = false;
+    }
+  }
 
   onMount(() => {
     api.pair().then((p) => (info = p)).catch((e) => (error = (e as Error).message));
@@ -47,15 +59,21 @@
     pairing = null; // never leave the previous phone's QR up if this attempt fails
     busy = true;
     try {
-      const { token, secret } = await createPairToken(reader.id, deviceSlug(deviceLabel), new Date(), api.createToken);
+      // A desktop pairing is named after the app (books-desktop-…), a phone after the device.
+      const { token, secret } = reader.desktop
+        ? await createPairToken(reader.id.replace(/-desktop$/, ''), 'desktop', new Date(), api.createToken)
+        : await createPairToken(reader.id, deviceSlug(deviceLabel), new Date(), api.createToken);
       const link = pairLink(reader.url, base, secret);
       let qr: Pairing['qr'] = null;
       let qrError = '';
-      try {
-        qr = qrPath(link);
-      } catch (e) {
-        qrError = (e as Error).message;
+      if (!reader.desktop) {
+        try {
+          qr = qrPath(link);
+        } catch (e) {
+          qrError = (e as Error).message;
+        }
       }
+      copied = false;
       pairing = { reader, device: deviceLabel || 'phone', name: token.name, link, qr, qrError };
       await onchange();
     } catch (e) {
@@ -74,7 +92,7 @@
   {#if error}<p class="error">{error}</p>{/if}
   {#if info}
     {#if plainHttp}
-      <p class="warn block">The hosted readers only load HTTPS catalogues. Set <code>public_url</code> to an HTTPS address.</p>
+      <p class="warn block">Phones need HTTPS: the hosted readers only load HTTPS catalogues. Set <code>public_url</code> to an HTTPS address. The desktop apps below can use this address.</p>
     {:else}
       {#if !info.publicUrl}
         <p class="warn">public_url is not set, so the QR uses this page's address (<code>{base}</code>). A phone may not reach it.</p>
@@ -95,13 +113,25 @@
       {/if}
     </div>
     <div class="readers">
-      {#each info.readers as r (r.id)}
-        <button disabled={plainHttp || busy} onclick={() => pair(r)}>{r.name}</button>
+      {#each phones as r (r.id)}
+        <button disabled={!canPair(r, plainHttp) || busy} onclick={() => pair(r)}>{r.name}</button>
       {/each}
     </div>
     {#if !plainHttp}
-      {#each info.readers.filter((r) => !r.corsAllowed) as r (r.id)}
-        <p class="warn">Add <code>{r.origin}</code> to <code>cors_origins</code>, or {r.name} can't load the catalogue.</p>
+      {#each phones.filter((r) => !r.corsAllowed) as r (r.id)}
+        <p class="warn">Add <code>{r.missing.join(', ')}</code> to <code>cors_origins</code>, or {r.name} can't load the catalogue.</p>
+      {/each}
+    {/if}
+    {#if computers.length}
+      <h3 class="caps">This computer</h3>
+      <p class="note muted">Opens the Skrivist app on this Mac or Windows PC with the catalogue filled in. The apps can use HTTP on your network.</p>
+      <div class="readers">
+        {#each computers as r (r.id)}
+          <button disabled={busy} onclick={() => pair(r)}>{r.name}</button>
+        {/each}
+      </div>
+      {#each computers.filter((r) => !r.corsAllowed) as r (r.id)}
+        <p class="warn">Add <code>{r.missing.join(', ')}</code> to <code>cors_origins</code>, or {r.name} can't load the catalogue.</p>
       {/each}
     {/if}
   {/if}
@@ -120,11 +150,16 @@
           <rect width={pairing.qr.size} height={pairing.qr.size} fill="#fff" />
           <path d={pairing.qr.d} fill="#000" />
         </svg>
-      {:else}
+      {:else if !pairing.reader.desktop}
         <p class="error">Couldn't draw the QR code: {pairing.qrError}</p>
       {/if}
       <div class="details">
-        <p>Open the camera on {pairing.device}, scan this, then tap Connect in {pairing.reader.name}.</p>
+        {#if pairing.reader.desktop}
+          <p><a href={pairing.link}>Open in {pairing.reader.name}</a>, then press Connect in the app. Or paste the link into its catalogue field.</p>
+          <button onclick={() => copy(pairing!.link)}>{copied ? 'Copied' : 'Copy link'}</button>
+        {:else}
+          <p>Open the camera on {pairing.device}, scan this, then tap Connect in {pairing.reader.name}.</p>
+        {/if}
         <p class="muted small">Token <strong>{pairing.name}</strong>. Revoke it under API tokens to unpair.</p>
         <code>{pairing.link}</code>
         <button onclick={() => (pairing = null)}>Done</button>

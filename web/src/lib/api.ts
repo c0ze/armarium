@@ -86,6 +86,10 @@ export interface PairReader {
   url: string;
   origin: string;
   corsAllowed: boolean;
+  /** A Skrivist desktop app (skrivist-<app>://pair) rather than a hosted reader. */
+  desktop?: boolean;
+  /** The exact cors_origins entries still to add. */
+  missing: string[];
 }
 
 export interface PairInfo {
