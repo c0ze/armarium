@@ -111,6 +111,7 @@ type req struct {
 	cookie             bool
 	ctype              string
 	headers            map[string]string
+	remote             string // RemoteAddr; httptest's default is 192.0.2.1:1234
 }
 
 func (e *env) do(q req) *httptest.ResponseRecorder {
@@ -120,6 +121,9 @@ func (e *env) do(q req) *httptest.ResponseRecorder {
 	}
 	r := httptest.NewRequest(q.method, q.path, strings.NewReader(q.body))
 	r.Host = "armarium.test"
+	if q.remote != "" {
+		r.RemoteAddr = q.remote
+	}
 	if q.host != "" {
 		r.Host = q.host
 	}

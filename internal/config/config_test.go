@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"slices"
@@ -151,5 +152,32 @@ func TestPublicURLEnv(t *testing.T) {
 	c, err := loadPublicURL(t, "", "h")
 	if err != nil || c.PublicURL != "https://h" {
 		t.Fatalf("env override: %q %v", c.PublicURL, err)
+	}
+}
+
+func TestTrustedProxies(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "armarium.toml")
+	write := func(body string) { os.WriteFile(p, []byte(body), 0o600) }
+	write(`trusted_proxies = ["10.0.0.0/8", "127.0.0.1", "::1", "fd00::/8"]`)
+	c, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range []string{"10.1.2.3", "127.0.0.1", "::1", "fd00::5"} {
+		if !Trusted(c.ProxyPrefixes(), netip.MustParseAddr(s)) {
+			t.Errorf("%s should be trusted", s)
+		}
+	}
+	if Trusted(c.ProxyPrefixes(), netip.MustParseAddr("192.0.2.1")) {
+		t.Error("192.0.2.1 is not in the list")
+	}
+	write(`trusted_proxies = ["nas"]`)
+	if _, err := Load(p); err == nil {
+		t.Fatal("a host name is not a proxy address")
+	}
+	write(`trusted_proxies = ["10.0.0.0/8"]`)
+	t.Setenv("ARMARIUM_TRUSTED_PROXIES", "127.0.0.1, 192.168.0.0/16")
+	if c, _ = Load(p); !slices.Equal(c.TrustedProxies, []string{"127.0.0.1", "192.168.0.0/16"}) {
+		t.Fatalf("env override: %v", c.TrustedProxies)
 	}
 }

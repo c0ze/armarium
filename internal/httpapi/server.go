@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"time"
 
 	"github.com/c0ze/armarium/internal/config"
@@ -23,21 +24,23 @@ type Server struct {
 	UI      fs.FS // built web app; may be nil
 	Log     *slog.Logger
 
-	limits formats.Limits
-	comics *formats.Cache[formats.Container]
-	books  *formats.Cache[*formats.EPUB]
-	sem    chan struct{} // bounds concurrent archive reads
-	logins *loginLimiter
+	limits  formats.Limits
+	comics  *formats.Cache[formats.Container]
+	books   *formats.Cache[*formats.EPUB]
+	sem     chan struct{} // bounds concurrent archive reads
+	logins  *loginLimiter
+	proxies []netip.Prefix // trusted_proxies
 }
 
 func New(cfg config.Config, st *store.Store, sc *scan.Scanner, cv *covers.Service, ui fs.FS, log *slog.Logger) *Server {
 	s := &Server{
 		Cfg: cfg, Store: st, Scanner: sc, Covers: cv, UI: ui, Log: log,
-		limits: formats.Limits{MaxEntryBytes: cfg.Limits.MaxEntryBytes, MaxEntries: cfg.Limits.MaxEntries},
-		comics: formats.NewCache[formats.Container](8),
-		books:  formats.NewCache[*formats.EPUB](4),
-		sem:    make(chan struct{}, cfg.Limits.MaxOpenArchives),
-		logins: newLoginLimiter(),
+		limits:  formats.Limits{MaxEntryBytes: cfg.Limits.MaxEntryBytes, MaxEntries: cfg.Limits.MaxEntries},
+		comics:  formats.NewCache[formats.Container](8),
+		books:   formats.NewCache[*formats.EPUB](4),
+		sem:     make(chan struct{}, cfg.Limits.MaxOpenArchives),
+		logins:  newLoginLimiter(),
+		proxies: cfg.ProxyPrefixes(),
 	}
 	if sc != nil {
 		sc.OnChange = s.Forget

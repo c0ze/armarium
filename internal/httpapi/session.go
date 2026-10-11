@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/netip"
 	"strings"
 	"sync"
 	"time"
@@ -37,7 +38,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "no password configured; run `armarium hash-password`")
 		return
 	}
-	if !s.logins.reserve() {
+	if !s.logins.reserve(s.clientAddr(r)) {
 		writeError(w, http.StatusTooManyRequests, "too many attempts, wait a minute")
 		return
 	}
@@ -57,7 +58,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name: sessionCookie, Value: secret, Path: "/", MaxAge: int(sessionTTL.Seconds()),
-		HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: s.Cfg.SecureCookie,
+		HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: s.Cfg.SecureCookie || s.isHTTPS(r),
 	})
 	writeJSON(w, http.StatusOK, map[string]bool{"authenticated": true, "admin": true})
 }
@@ -67,35 +68,58 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 		s.Store.DeleteSession(r.Context(), auth.Digest(c.Value))
 	}
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: "", Path: "/", MaxAge: -1,
-		HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: s.Cfg.SecureCookie})
+		HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: s.Cfg.SecureCookie || s.isHTTPS(r)})
 	writeJSON(w, http.StatusOK, map[string]bool{"authenticated": false})
 }
 
-// loginLimiter allows 5 login attempts per minute across all clients, counted
-// before the password is checked so parallel requests cannot all slip through.
-// There is one password, so a global limit is the simplest brute-force brake.
-// Checks also run one at a time: each argon2id check takes 64 MiB, and the NAS
-// container has 256 MiB in total.
+// loginLimiter allows 5 login attempts per minute from each client, and 30 a
+// minute in all, counted before the password is checked so parallel requests
+// cannot all slip through. Per client, so someone hammering the login cannot
+// keep the owner out from another address; the ceiling still caps a spread-out
+// guess. Checks also run one at a time: each argon2id check takes 64 MiB, and
+// the NAS container has 256 MiB in total.
 type loginLimiter struct {
 	mu       sync.Mutex
-	attempts []time.Time
+	attempts map[netip.Addr][]time.Time
+	all      []time.Time
 	checking sync.Mutex
 }
 
-func newLoginLimiter() *loginLimiter { return &loginLimiter{} }
+const (
+	loginsPerClient = 5
+	loginsInAll     = 30
+)
 
-// reserve counts an attempt, or refuses it when the minute's budget is spent.
-func (l *loginLimiter) reserve() bool {
+func newLoginLimiter() *loginLimiter { return &loginLimiter{attempts: map[netip.Addr][]time.Time{}} }
+
+// recent drops attempts older than a minute.
+func recent(times []time.Time, cut time.Time) []time.Time {
+	for len(times) > 0 && times[0].Before(cut) {
+		times = times[1:]
+	}
+	return times
+}
+
+// reserve counts an attempt from client, or refuses it when its minute's budget
+// (or everyone's) is spent.
+func (l *loginLimiter) reserve(client netip.Addr) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	cut := time.Now().Add(-time.Minute)
-	for len(l.attempts) > 0 && l.attempts[0].Before(cut) {
-		l.attempts = l.attempts[1:]
+	now := time.Now()
+	cut := now.Add(-time.Minute)
+	for a, times := range l.attempts {
+		if times = recent(times, cut); len(times) == 0 {
+			delete(l.attempts, a)
+		} else {
+			l.attempts[a] = times
+		}
 	}
-	if len(l.attempts) >= 5 {
+	l.all = recent(l.all, cut)
+	if len(l.attempts[client]) >= loginsPerClient || len(l.all) >= loginsInAll {
 		return false
 	}
-	l.attempts = append(l.attempts, time.Now())
+	l.attempts[client] = append(l.attempts[client], now)
+	l.all = append(l.all, now)
 	return true
 }
 

@@ -5,6 +5,7 @@ import (
 	"github.com/c0ze/armarium/internal/formats"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"strings"
 	"sync"
 	"testing"
@@ -340,5 +341,77 @@ func TestPreflightVariesOnItsRequestHeaders(t *testing.T) {
 		if !strings.Contains(vary, h) {
 			t.Fatalf("preflight Vary %q lacks %s", vary, h)
 		}
+	}
+}
+
+func TestStaleHeaderDoesNotHideAPathToken(t *testing.T) {
+	e := newEnv(t)
+	// A proxy's own login or a revoked Bearer must not shadow the token in the path.
+	w := e.do(req{path: "/opds/t/" + e.token + "/v1.2/catalog", headers: map[string]string{"Authorization": "Bearer stale"}})
+	if w.Code != http.StatusOK {
+		t.Fatalf("path token behind a stale header: %d", w.Code)
+	}
+}
+
+func TestTokenStoreFailureIsAServerError(t *testing.T) {
+	e := newEnv(t)
+	e.srv.Store.DB.Close()
+	if w := e.do(req{path: "/api/libraries", token: e.token}); w.Code != http.StatusInternalServerError {
+		t.Fatalf("a broken database must not look like a revoked token: %d", w.Code)
+	}
+}
+
+func TestLoginLimitIsPerClient(t *testing.T) {
+	e := newEnv(t)
+	login := func(remote, password, forwarded string) int {
+		q := req{method: "POST", path: "/api/login", body: `{"password":"` + password + `"}`, origin: "https://armarium.test", remote: remote}
+		if forwarded != "" {
+			q.headers = map[string]string{"X-Forwarded-For": forwarded}
+		}
+		return e.do(q).Code
+	}
+	for i := range 5 {
+		if c := login("192.0.2.1:1", "wrong", ""); c != http.StatusUnauthorized {
+			t.Fatalf("attempt %d: %d", i, c)
+		}
+	}
+	if c := login("192.0.2.1:1", "wrong", ""); c != http.StatusTooManyRequests {
+		t.Fatalf("sixth attempt: %d", c)
+	}
+	if c := login("192.0.2.2:1", testPassword, ""); c != http.StatusOK {
+		t.Fatalf("another client must still be able to log in: %d", c)
+	}
+	// Behind a trusted proxy the forwarded client is what counts.
+	e.srv.proxies = []netip.Prefix{netip.MustParsePrefix("192.0.2.1/32")}
+	if c := login("192.0.2.1:1", testPassword, "198.51.100.7"); c != http.StatusOK {
+		t.Fatalf("forwarded client: %d", c)
+	}
+	for range 5 {
+		login("192.0.2.1:1", "wrong", "198.51.100.8")
+	}
+	if c := login("192.0.2.1:1", testPassword, "198.51.100.8"); c != http.StatusTooManyRequests {
+		t.Fatalf("forwarded client over its limit: %d", c)
+	}
+	if c := login("192.0.2.3:1", testPassword, "198.51.100.8"); c != http.StatusOK {
+		t.Fatalf("an untrusted peer's X-Forwarded-For must be ignored: %d", c)
+	}
+}
+
+func TestSessionCookieIsSecureBehindAnHTTPSProxy(t *testing.T) {
+	e := newEnv(t)
+	e.srv.proxies = []netip.Prefix{netip.MustParsePrefix("192.0.2.1/32")}
+	login := func(remote string) string {
+		w := e.do(req{method: "POST", path: "/api/login", body: `{"password":"` + testPassword + `"}`, origin: "https://armarium.test",
+			remote: remote, headers: map[string]string{"X-Forwarded-Proto": "https"}})
+		if w.Code != http.StatusOK {
+			t.Fatalf("login from %s: %d", remote, w.Code)
+		}
+		return w.Header().Get("Set-Cookie")
+	}
+	if c := login("192.0.2.1:1"); !strings.Contains(c, "Secure") {
+		t.Fatalf("HTTPS through a trusted proxy: %q", c)
+	}
+	if c := login("192.0.2.9:1"); strings.Contains(c, "Secure") {
+		t.Fatalf("an untrusted peer cannot claim HTTPS: %q", c)
 	}
 }

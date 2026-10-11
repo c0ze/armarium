@@ -115,7 +115,11 @@ const (
 // identifies the caller, enforces the route's access level, then the CSRF rules.
 func (s *Server) guard(level Access, h http.HandlerFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		p := s.identify(r)
+		p, err := s.identify(r)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
 		r = r.WithContext(context.WithValue(r.Context(), ctxKey{}, p))
 		switch {
 		case level == Reader && p == Anonymous:
@@ -134,40 +138,58 @@ func (s *Server) guard(level Access, h http.HandlerFunc) http.Handler {
 	})
 }
 
-func (s *Server) identify(r *http.Request) Principal {
+// identify says how a request authenticated. A store failure is an error, not
+// an anonymous request: a broken database must not look like a revoked token.
+func (s *Server) identify(r *http.Request) (Principal, error) {
 	ctx := r.Context()
-	valid := func(secret string) bool {
-		ok, err := s.Store.TokenValid(ctx, auth.Digest(secret))
-		return err == nil && ok
-	}
+	valid := func(secret string) (bool, error) { return s.Store.TokenValid(ctx, auth.Digest(secret)) }
 	if c, err := r.Cookie(sessionCookie); err == nil && c.Value != "" {
-		if ok, err := s.Store.SessionValid(ctx, auth.Digest(c.Value)); err == nil && ok {
-			return Session
+		ok, err := s.Store.SessionValid(ctx, auth.Digest(c.Value))
+		if err != nil {
+			return Anonymous, err
+		}
+		if ok {
+			return Session, nil
 		}
 	}
 	if h := r.Header.Get("Authorization"); h != "" {
 		scheme, cred, _ := strings.Cut(h, " ")
+		secret, as := "", Anonymous
 		switch strings.ToLower(scheme) {
 		case "bearer":
-			if valid(strings.TrimSpace(cred)) {
-				return Token
-			}
+			secret, as = strings.TrimSpace(cred), Token
 		case "basic":
 			if raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(cred)); err == nil {
-				if _, pass, ok := strings.Cut(string(raw), ":"); ok && valid(pass) {
-					return Basic
+				if _, pass, ok := strings.Cut(string(raw), ":"); ok {
+					secret, as = pass, Basic
 				}
 			}
 		}
-		return Anonymous
+		if secret != "" {
+			ok, err := valid(secret)
+			if err != nil {
+				return Anonymous, err
+			}
+			if ok {
+				return as, nil
+			}
+		}
+		// An unusable header (a proxy's own login, a revoked token) does not
+		// hide a valid ?token= or path token below.
 	}
-	if t := r.URL.Query().Get("token"); t != "" && valid(t) {
-		return Token
+	for _, t := range []string{r.URL.Query().Get("token"), r.PathValue("token")} {
+		if t == "" {
+			continue
+		}
+		ok, err := valid(t)
+		if err != nil {
+			return Anonymous, err
+		}
+		if ok {
+			return Token, nil
+		}
 	}
-	if t := r.PathValue("token"); t != "" && valid(t) {
-		return Token
-	}
-	return Anonymous
+	return Anonymous, nil
 }
 
 // writeAllowed is the CSRF check for state-changing requests. JSON-only bodies

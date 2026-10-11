@@ -8,7 +8,11 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
+	"os/signal"
 	"strings"
+	"sync"
+	"syscall"
 	"text/tabwriter"
 	"time"
 
@@ -45,7 +49,9 @@ func healthcheck() error {
 
 func hashPassword() error {
 	fmt.Fprint(os.Stderr, "password: ")
+	restore := hideInput()
 	line, err := bufio.NewReader(os.Stdin).ReadString('\n')
+	restore()
 	if err != nil && line == "" {
 		return errors.New("no password on stdin")
 	}
@@ -161,4 +167,41 @@ func (a *app) library(ctx context.Context, args []string) error {
 		return fmt.Errorf("unknown library command %q", args[0])
 	}
 	return nil
+}
+
+// hideInput turns terminal echo off while a password is typed, and back on even
+// when the user presses Ctrl-C: Go's default SIGINT exit would skip a defer and
+// leave the terminal silent.
+func hideInput() func() {
+	if fi, err := os.Stdin.Stat(); err != nil || fi.Mode()&os.ModeCharDevice == 0 {
+		return func() {} // piped (docker run -i): nothing is echoed anyway
+	}
+	stty := func(arg string) error {
+		c := exec.Command("stty", arg)
+		c.Stdin = os.Stdin
+		return c.Run()
+	}
+	if stty("-echo") != nil {
+		return func() {}
+	}
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-sig:
+			stty("echo")
+			fmt.Fprintln(os.Stderr)
+			os.Exit(130)
+		case <-done:
+		}
+	}()
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			close(done)
+			signal.Stop(sig)
+			stty("echo")
+		})
+	}
 }

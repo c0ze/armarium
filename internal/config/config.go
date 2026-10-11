@@ -52,6 +52,10 @@ type Config struct {
 	PublicURL    string `toml:"public_url"`
 	PasswordHash string `toml:"password_hash"`
 	SecureCookie bool   `toml:"secure_cookie"`
+	// TrustedProxies are reverse proxies (IPs or CIDRs) whose X-Forwarded-For
+	// and X-Forwarded-Proto are believed: login limits count the real client
+	// and the session cookie is Secure for HTTPS visitors.
+	TrustedProxies []string `toml:"trusted_proxies"`
 	// PanelFlowURL is where PanelFlow is served (e.g. https://host/comics); the UI
 	// links comics to its Armarium mode there.
 	PanelFlowURL string    `toml:"panelflow_url"`
@@ -108,6 +112,9 @@ func applyEnv(c *Config) {
 	if v := os.Getenv("ARMARIUM_CORS_ORIGINS"); v != "" {
 		c.CORSOrigins = splitList(v)
 	}
+	if v := os.Getenv("ARMARIUM_TRUSTED_PROXIES"); v != "" {
+		c.TrustedProxies = splitList(v)
+	}
 }
 
 func splitList(v string) []string {
@@ -126,6 +133,11 @@ func (c *Config) validate() error {
 	}
 	if c.PanelFlowURL != "" && !strings.HasPrefix(c.PanelFlowURL, "https://") && !strings.HasPrefix(c.PanelFlowURL, "http://") {
 		return fmt.Errorf("panelflow_url %q must be an http(s) URL", c.PanelFlowURL)
+	}
+	for _, p := range c.TrustedProxies {
+		if _, err := parseProxy(p); err != nil {
+			return err
+		}
 	}
 	pub, err := canonicalPublicURL(c.PublicURL)
 	if err != nil {

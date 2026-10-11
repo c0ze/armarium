@@ -157,6 +157,11 @@ func (a *app) serve(ctx context.Context) error {
 		MaxPixels: a.cfg.Limits.MaxImagePixels,
 		MaxBytes:  a.cfg.Limits.MaxEntryBytes,
 	}
+	if cleared, err := a.store.ResetSessionsIfPasswordChanged(ctx, a.cfg.PasswordHash); err != nil {
+		return err
+	} else if cleared {
+		a.log.Info("owner sessions cleared: the password changed")
+	}
 	srv := httpapi.New(a.cfg, a.store, a.scanner, cv, web.FS(), a.log)
 	if a.cfg.PasswordHash == "" {
 		a.log.Warn("no password_hash configured: the web UI cannot log in (tokens still work); run `armarium hash-password`")
