@@ -193,3 +193,23 @@ func TestMigrationKeepsProgressAndTags(t *testing.T) {
 		t.Fatalf("after migration %+v %v", it, err)
 	}
 }
+
+// Within one second a reset and the next page save must still be ordered, so
+// readers can compare updatedAt to tell which side changed last.
+func TestProgressRevisionsAlwaysMoveForward(t *testing.T) {
+	s := openTest(t)
+	_, ids := seed(t, s, "a.cbz")
+	ctx := context.Background()
+	s.Now = func() time.Time { return time.Unix(1000, 0) }
+	var last int64
+	for i, u := range []ProgressUpdate{{Page: 5}, {Status: "unread", Reset: true}, {Page: 6}} {
+		p, applied, err := s.SaveProgress(ctx, ids[0], 10, u)
+		if err != nil || !applied {
+			t.Fatalf("write %d: applied %v, %v", i, applied, err)
+		}
+		if p.UpdatedAt <= last {
+			t.Fatalf("write %d: updatedAt %d does not follow %d", i, p.UpdatedAt, last)
+		}
+		last = p.UpdatedAt
+	}
+}

@@ -17,6 +17,8 @@ type ProgressUpdate struct {
 // SaveProgress applies u to item and returns the stored progress. Without Reset the
 // write is monotonic, enforced in SQL: a lower page than the stored one is ignored
 // and a "read" status is never downgraded. applied reports whether the write landed.
+// updated_at increases with every applied write, even within one second, so it
+// orders changes: readers compare it to tell which side changed last.
 func (s *Store) SaveProgress(ctx context.Context, itemID int64, pages int, u ProgressUpdate) (p Progress, applied bool, err error) {
 	status := u.Status
 	if status == "" {
@@ -34,14 +36,14 @@ func (s *Store) SaveProgress(ctx context.Context, itemID int64, pages int, u Pro
 		res, err = s.DB.ExecContext(ctx, `INSERT INTO progress (item_id, page, locator, status, updated_at)
 			VALUES (?, ?, ?, ?, ?)
 			ON CONFLICT (item_id) DO UPDATE SET page = excluded.page, locator = excluded.locator,
-			  status = excluded.status, updated_at = excluded.updated_at`,
+			  status = excluded.status, updated_at = MAX(excluded.updated_at, progress.updated_at + 1)`,
 			itemID, u.Page, u.Locator, status, s.now())
 	} else {
 		res, err = s.DB.ExecContext(ctx, `INSERT INTO progress (item_id, page, locator, status, updated_at)
 			VALUES (?, ?, ?, ?, ?)
 			ON CONFLICT (item_id) DO UPDATE SET page = excluded.page, locator = excluded.locator,
 			  status = CASE WHEN progress.status = 'read' THEN 'read' ELSE excluded.status END,
-			  updated_at = excluded.updated_at
+			  updated_at = MAX(excluded.updated_at, progress.updated_at + 1)
 			WHERE excluded.page >= progress.page`,
 			itemID, u.Page, u.Locator, status, s.now())
 	}
