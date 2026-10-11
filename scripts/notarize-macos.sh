@@ -27,11 +27,26 @@ else
 fi
 profile=${MAC_NOTARY_PROFILE:-gand-notary}
 scratch=$(mktemp -d "${TMPDIR:-/tmp}/armarium-macos.XXXXXX")
-trap 'rm -rf "$scratch"' EXIT
+cleanup() {
+  rm -rf "$scratch"
+  # Lock again only a keychain this script unlocked (never the login keychain).
+  if [[ -n "$pass_file" ]]; then security lock-keychain "$keychain" || true; fi
+}
+trap cleanup EXIT
 
-# The unlock lasts for this session only.
-if [[ -n "$pass_file" ]]; then security unlock-keychain -p "$(cat "$pass_file")" "$keychain"; fi
+# Sign only the commit the release workflow built (its draft's target).
+if command -v gh >/dev/null; then
+  target=$(gh release view "$version" --repo c0ze/armarium --json targetCommitish -q .targetCommitish 2>/dev/null || true)
+  if [[ -n "$target" && "$target" != "$(git rev-parse HEAD)" ]]; then
+    echo "HEAD is not $target, the commit the $version release was built from" >&2; exit 1
+  fi
+  [[ -n "$target" ]] || echo "warning: could not read the $version release; check that HEAD is its commit" >&2
+else
+  echo "warning: gh is not installed; check that HEAD is the commit the $version release was built from" >&2
+fi
 
+# Everything that runs third-party code (npm install scripts, the Go toolchain)
+# runs before the signing keychain is unlocked.
 (cd web && npm ci --no-audit --no-fund && npm run build)
 for arch in amd64 arm64; do
   CGO_ENABLED=0 GOOS=darwin GOARCH=$arch go build -trimpath \
@@ -39,6 +54,9 @@ for arch in amd64 arm64; do
 done
 mkdir "$scratch/package"
 lipo -create "$scratch/armarium-amd64" "$scratch/armarium-arm64" -output "$scratch/package/armarium"
+# Unlocked only to sign; the cleanup trap locks it again. The password is on
+# security's argument list for this one call.
+if [[ -n "$pass_file" ]]; then security unlock-keychain -p "$(cat "$pass_file")" "$keychain"; fi
 codesign --force --timestamp --options runtime --keychain "$keychain" \
   --identifier com.gand.armarium -s "$identity" "$scratch/package/armarium"
 codesign --verify --strict --verbose=2 "$scratch/package/armarium"

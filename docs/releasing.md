@@ -14,8 +14,11 @@
    `Developer ID Application: Gand (7696W4CMNC)` with the `gand-notary`
    profile. In a local Terminal session it signs with the login keychain; over
    ssh (where the login keychain is locked) it uses the dedicated
-   `gand-signing` keychain and unlocks it for that session from its password
-   file. `MAC_SIGN_IDENTITY`, `MAC_KEYCHAIN`, `MAC_KEYCHAIN_PASS_FILE` and
+   `gand-signing` keychain, unlocks it from its password file just before
+   signing (after the web and Go builds, so no install script runs while it
+   is unlocked) and locks it again when the script exits. The password is on
+   `security`'s argument list for that one call. With `gh` installed, the
+   script refuses to sign unless HEAD is the draft release's target commit. `MAC_SIGN_IDENTITY`, `MAC_KEYCHAIN`, `MAC_KEYCHAIN_PASS_FILE` and
    `MAC_NOTARY_PROFILE` select another existing identity, keychain or profile.
    Never add signing credentials to the repository or release assets.
 3. Download the draft's Linux/Windows archives into the release-assets directory:
