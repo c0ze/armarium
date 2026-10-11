@@ -2,6 +2,16 @@ package formats
 
 import "strings"
 
+// PageLess orders archive pages: shallower paths first, so a cover at the root
+// comes before chapter folders, then NaturalLess on the full path. Page numbers
+// stored before v0.5.0 followed NaturalLess alone (see scan.RemapPageOrder).
+func PageLess(a, b string) bool {
+	if da, db := strings.Count(a, "/"), strings.Count(b, "/"); da != db {
+		return da < db
+	}
+	return NaturalLess(a, b)
+}
+
 // NaturalLess orders strings with embedded numbers numerically, case-insensitively:
 // "page2" < "page10", "Vol 9" < "vol 10".
 func NaturalLess(a, b string) bool {

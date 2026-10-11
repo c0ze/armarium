@@ -78,7 +78,9 @@ func (s *Server) getPage(w http.ResponseWriter, r *http.Request) {
 
 // servePage streams page idx (0-based); shared with the OPDS-PSE route.
 func (s *Server) servePage(w http.ResponseWriter, r *http.Request, it store.Item, idx int) {
-	etag := fmt.Sprintf(`"%d-%d-%d-%d"`, it.ID, it.MTime, it.Size, idx)
+	// The numbering generation is part of the tag: after a reorder, the same
+	// index is another image, and a cached copy must not revalidate as current.
+	etag := fmt.Sprintf(`"%d-%d-%d-%d-p%d"`, it.ID, it.MTime, it.Size, idx, store.PageOrder)
 	if r.Header.Get("If-None-Match") == etag {
 		w.WriteHeader(http.StatusNotModified)
 		return
@@ -107,6 +109,33 @@ func (s *Server) servePage(w http.ResponseWriter, r *http.Request, it store.Item
 	h.Set("ETag", etag)
 	h.Set("X-Armarium-Pages", strconv.Itoa(c.Pages()))
 	io.Copy(w, rc)
+}
+
+// getPageNames lists a comic's pages in reading order by their archive entry
+// names, so a client that unpacked the same file can match its own pages to
+// these page numbers whatever order it sorts them in.
+func (s *Server) getPageNames(w http.ResponseWriter, r *http.Request) {
+	it, ok := s.item(w, r)
+	if !ok {
+		return
+	}
+	release, err := s.acquire(r.Context())
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	defer release()
+	c, done, err := s.openComic(r.Context(), it)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	defer done()
+	pages := make([]map[string]string, c.Pages())
+	for i := range pages {
+		pages[i] = map[string]string{"name": c.Name(i)}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"pages": pages})
 }
 
 // getCover serves a lazily generated thumbnail: the first page of a comic or the

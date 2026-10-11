@@ -162,6 +162,11 @@ func (a *app) serve(ctx context.Context) error {
 	} else if cleared {
 		a.log.Info("owner sessions cleared: the password changed")
 	}
+	// Page numbers stored before the root-first order move to the new numbers
+	// once; a comic that cannot be opened now is retried at the next start.
+	if err := a.scanner.RemapPageOrder(ctx); err != nil {
+		a.log.Error("page order remap", "err", err)
+	}
 	srv := httpapi.New(a.cfg, a.store, a.scanner, cv, web.FS(), a.log)
 	if a.cfg.PasswordHash == "" {
 		a.log.Warn("no password_hash configured: the web UI cannot log in (tokens still work); run `armarium hash-password`")

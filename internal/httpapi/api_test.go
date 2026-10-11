@@ -3,6 +3,7 @@ package httpapi
 import (
 	"bytes"
 	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -156,5 +157,41 @@ func TestUIFallbackWithoutBuild(t *testing.T) {
 	}
 	if w := e.do(req{path: "/api/nope", token: e.token}); w.Code != 404 || !strings.Contains(w.Body.String(), "error") {
 		t.Fatalf("unknown api path: %d", w.Code)
+	}
+}
+
+func TestPageNamesAndNumbering(t *testing.T) {
+	e := newEnv(t)
+	w := e.do(req{path: fmt.Sprintf("/api/items/%d/pages", e.comicID), token: e.token})
+	got := decode[struct {
+		Pages []struct {
+			Name string `json:"name"`
+		} `json:"pages"`
+	}](t, w)
+	var names []string
+	for _, p := range got.Pages {
+		names = append(names, p.Name)
+	}
+	if strings.Join(names, ",") != "01.png,02.png,03.jpg" {
+		t.Fatalf("names %v", names)
+	}
+	if w := e.do(req{path: fmt.Sprintf("/api/items/%d/pages", e.bookID), token: e.token}); w.Code != http.StatusNotFound {
+		t.Fatalf("EPUB page list: %d", w.Code)
+	}
+	if w := e.do(req{path: fmt.Sprintf("/api/items/%d/pages", e.comicID)}); w.Code != http.StatusUnauthorized {
+		t.Fatalf("page list without a token: %d", w.Code)
+	}
+	item := func(id int64) map[string]any {
+		return decode[map[string]map[string]any](t, e.do(req{path: fmt.Sprintf("/api/items/%d", id), token: e.token}))["item"]
+	}
+	if item(e.comicID)["pageOrder"] != float64(2) {
+		t.Fatalf("comic pageOrder: %v", item(e.comicID)["pageOrder"])
+	}
+	if _, ok := item(e.bookID)["pageOrder"]; ok {
+		t.Fatal("an EPUB has no page numbering to report")
+	}
+	// A cached page of another numbering must not be revalidated as current.
+	if etag := e.do(req{path: fmt.Sprintf("/api/items/%d/pages/1", e.comicID), token: e.token}).Header().Get("ETag"); !strings.HasSuffix(etag, `-p2"`) {
+		t.Fatalf("page ETag %q lacks the numbering generation", etag)
 	}
 }

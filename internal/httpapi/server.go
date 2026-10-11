@@ -71,6 +71,7 @@ func (s *Server) Handler() http.Handler {
 	route("GET /api/items", Reader, s.listItems)
 	route("GET /api/items/{id}", Reader, s.getItem)
 	route("GET /api/items/{id}/cover", Reader, s.getCover)
+	route("GET /api/items/{id}/pages", Reader, s.getPageNames)
 	route("GET /api/items/{id}/pages/{n}", Reader, s.getPage)
 	route("GET /api/items/{id}/pages/{n}/panels", Reader, s.getPanels)
 	route("PUT /api/items/{id}/pages/{n}/panels", Reader, s.putPanels)

@@ -6,7 +6,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
+	"strings"
 	"testing"
 
 	tu "github.com/c0ze/armarium/internal/testutil"
@@ -160,6 +162,7 @@ type fakeContainer struct{ closed bool }
 func (f *fakeContainer) Pages() int                              { return 0 }
 func (f *fakeContainer) Page(int) (io.ReadCloser, string, error) { return nil, "", ErrNoPage }
 func (f *fakeContainer) Close() error                            { f.closed = true; return nil }
+func (f *fakeContainer) Name(int) string                         { return "" }
 
 // Comics are often saved with the wrong extension; the signature decides.
 func TestMisnamedArchivesOpenByContent(t *testing.T) {
@@ -173,6 +176,33 @@ func TestMisnamedArchivesOpenByContent(t *testing.T) {
 		}
 		if c.Pages() != 3 {
 			t.Fatalf("%s: pages %d", filepath.Base(p), c.Pages())
+		}
+		c.Close()
+	}
+}
+
+// A cover at the archive root comes before the chapter folders, in ZIP and RAR.
+func TestRootPagesComeFirst(t *testing.T) {
+	dir := t.TempDir()
+	cover := tu.PNG(4, 4, 200)
+	entries := []tu.Entry{{Name: "chapter1/01.png", Data: tu.PNG(4, 4, 10)}, {Name: "chapter1/02.png", Data: tu.PNG(4, 4, 20)}, {Name: "cover.png", Data: cover}}
+	for _, p := range []string{tu.WriteZip(t, dir, "n.cbz", entries...), tu.WriteRAR(t, dir, "n.cbr", entries...)} {
+		c, err := Open(p, strings.TrimPrefix(filepath.Ext(p), "."), lim)
+		if err != nil {
+			t.Fatalf("%s: %v", p, err)
+		}
+		names := []string{c.Name(0), c.Name(1), c.Name(2)}
+		if want := []string{"cover.png", "chapter1/01.png", "chapter1/02.png"}; !slices.Equal(names, want) {
+			t.Fatalf("%s: %v, want %v", filepath.Base(p), names, want)
+		}
+		rc, _, err := c.Page(0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, _ := io.ReadAll(rc)
+		rc.Close()
+		if !bytes.Equal(b, cover) {
+			t.Fatalf("%s: page 1 is not the cover", filepath.Base(p))
 		}
 		c.Close()
 	}

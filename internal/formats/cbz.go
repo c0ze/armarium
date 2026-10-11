@@ -29,7 +29,7 @@ func openZip(p string, lim Limits) (Container, error) {
 			c.pages = append(c.pages, zf)
 		}
 	}
-	sort.SliceStable(c.pages, func(i, j int) bool { return NaturalLess(c.pages[i].Name, c.pages[j].Name) })
+	sort.SliceStable(c.pages, func(i, j int) bool { return PageLess(c.pages[i].Name, c.pages[j].Name) })
 	return c, nil
 }
 
@@ -49,6 +49,8 @@ func newZipReader(f *os.File, lim Limits) (*zip.Reader, error) {
 }
 
 func (c *zipContainer) Pages() int { return len(c.pages) }
+
+func (c *zipContainer) Name(i int) string { return c.pages[i].Name }
 
 func (c *zipContainer) Page(i int) (io.ReadCloser, string, error) {
 	if i < 0 || i >= len(c.pages) {

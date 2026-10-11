@@ -36,7 +36,9 @@ type Service struct {
 // Path returns the cached thumbnail for key (item id plus a version such as the
 // file's mtime), generating it from src on a miss. src returns the source image.
 func (s *Service) Path(id, version int64, src func() (io.ReadCloser, error)) (string, error) {
-	p := filepath.Join(s.Dir, fmt.Sprintf("%d-%d.jpg", id, version))
+	// -p2: thumbnails made under the root-first page order (a comic's first page
+	// may have changed); older files are removed by the glob below.
+	p := filepath.Join(s.Dir, fmt.Sprintf("%d-%d-p2.jpg", id, version))
 	if _, err := os.Stat(p); err == nil {
 		return p, nil
 	}

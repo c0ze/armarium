@@ -34,7 +34,15 @@ type Item struct {
 	// downloadable with /file?format=; the item's own Format is not repeated.
 	Formats  []string `json:"formats"`
 	Progress Progress `json:"progress"`
+	// PageOrder is the numbering generation of a comic's page numbers (progress,
+	// panel corrections, page URLs), so a client can tell numbers it stored
+	// under an older order. Absent for formats without pages.
+	PageOrder int `json:"pageOrder,omitempty"`
 }
+
+// PageOrder is the current page numbering: 2 since v0.5.0 put pages at the
+// archive root before chapter folders.
+const PageOrder = 2
 
 type ItemFilter struct {
 	LibraryID, SeriesID int64
@@ -70,6 +78,9 @@ func scanItem(sc interface{ Scan(...any) error }) (Item, error) {
 	it.Formats = []string{}
 	if formats != "" {
 		it.Formats = strings.Split(formats, ",")
+	}
+	if it.Format == "cbz" || it.Format == "cbr" {
+		it.PageOrder = PageOrder
 	}
 	return it, err
 }

@@ -46,11 +46,13 @@ func openRar(p string, lim Limits) (Container, error) {
 	if err != nil {
 		return nil, err
 	}
-	sort.SliceStable(c.pages, func(i, j int) bool { return NaturalLess(c.pages[i], c.pages[j]) })
+	sort.SliceStable(c.pages, func(i, j int) bool { return PageLess(c.pages[i], c.pages[j]) })
 	return c, nil
 }
 
 func (c *rarContainer) Pages() int { return len(c.pages) }
+
+func (c *rarContainer) Name(i int) string { return c.pages[i] }
 
 // Page reads the whole entry under the lock (pages are a few MiB, capped by
 // MaxEntryBytes) so concurrent requests never interleave on the shared decoder.

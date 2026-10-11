@@ -29,6 +29,9 @@ type Container interface {
 	Pages() int
 	// Page streams page i (0-based) and returns its media type.
 	Page(i int) (io.ReadCloser, string, error)
+	// Name is page i's archive entry name, so a client that unpacked the same
+	// file can match its pages to these numbers.
+	Name(i int) string
 	Close() error
 }
 
