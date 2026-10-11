@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/c0ze/armarium/internal/store"
@@ -102,5 +104,35 @@ func TestPanelsValidateImageBoundsAndAuthentication(t *testing.T) {
 		if w := e.do(req{path: target, token: e.token}); w.Code != 404 {
 			t.Fatalf("invalid page: %d", w.Code)
 		}
+	}
+}
+
+func TestPanelCorrectionsUpToSchemaLimits(t *testing.T) {
+	e := newEnv(t)
+	path := fmt.Sprintf("/api/items/%d/pages/2/panels", e.comicID)
+	rect := []float64{0.12345678901234567, 0.23456789012345678, 0.34567890123456789, 0.45678901234567891}
+	input := panelInput()
+	input.Panels = make([]store.PanelBox, 100)
+	for i := range input.Panels {
+		input.Panels[i] = store.PanelBox{ID: i, Rect: rect}
+	}
+	input.AutomaticPanels = make([]store.PanelBox, 500)
+	for i := range input.AutomaticPanels {
+		input.AutomaticPanels[i] = store.PanelBox{ID: i, Rect: rect}
+	}
+	input.AutomaticCandidates = make([][]float64, 500)
+	for i := range input.AutomaticCandidates {
+		input.AutomaticCandidates[i] = rect
+	}
+	body, _ := json.Marshal(input)
+	if len(body) <= 64<<10 {
+		t.Fatalf("fixture too small to matter: %d bytes", len(body))
+	}
+	if w := e.do(req{method: "PUT", path: path, body: string(body), token: e.token}); w.Code != http.StatusOK {
+		t.Fatalf("largest valid correction (%d bytes): %d %s", len(body), w.Code, w.Body)
+	}
+	junk := `{"imageHash":"` + input.ImageHash + `","revision":1,"detector":{"model":"` + strings.Repeat("x", 300<<10) + `"}}`
+	if w := e.do(req{method: "PUT", path: path, body: junk, token: e.token}); w.Code != http.StatusRequestEntityTooLarge || !strings.Contains(w.Body.String(), "too large") {
+		t.Fatalf("oversized body: %d %s", w.Code, w.Body)
 	}
 }

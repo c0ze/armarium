@@ -42,7 +42,16 @@ func (s *Server) putPanels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var correction store.PanelCorrection
-	if decodeJSON(r, &correction) != nil || !correction.Valid() || correction.UpdatedAt != 0 {
+	if err := decodeJSON(r, &correction); err != nil {
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			writeError(w, http.StatusRequestEntityTooLarge, "panel correction too large")
+			return
+		}
+		writeError(w, http.StatusBadRequest, "invalid panel correction")
+		return
+	}
+	if !correction.Valid() || correction.UpdatedAt != 0 {
 		writeError(w, http.StatusBadRequest, "invalid panel correction")
 		return
 	}

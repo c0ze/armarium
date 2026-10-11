@@ -17,6 +17,8 @@ import (
 const (
 	sessionCookie = "armarium_session"
 	maxBodyBytes  = 64 << 10
+	// The largest panel correction Valid() accepts is about 100 KiB of JSON.
+	maxPanelBytes = 256 << 10
 )
 
 // Principal says how a request authenticated.
@@ -48,7 +50,11 @@ func (s *Server) base(next http.Handler) http.Handler {
 		h := w.Header()
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Referrer-Policy", "no-referrer")
-		r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+		limit := int64(maxBodyBytes)
+		if r.Method == http.MethodPut && strings.HasSuffix(r.URL.Path, "/panels") {
+			limit = maxPanelBytes
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, limit)
 		http.NewResponseController(w).SetWriteDeadline(time.Now().Add(2 * time.Minute))
 		next.ServeHTTP(w, r)
 	})
