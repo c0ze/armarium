@@ -92,6 +92,8 @@ bin/armarium serve        # http://127.0.0.1:8580
   their Mac and Windows apps): offline-first readers; pair them from Admin.
 - **PanelFlow / comics.skriv.ist Armarium mode:** guided panel-by-panel reading with
   progress sync.
+- **CrossPoint Reader** (Xteink X4 and other e-ink readers): OPDS downloads and
+  reading positions synced over the KOReader sync protocol at `/kosync`.
 - **Your own tools:** a small JSON API with bearer tokens.
 
 See [docs/clients.md](docs/clients.md). Coming from Kavita? `armarium import-kavita`

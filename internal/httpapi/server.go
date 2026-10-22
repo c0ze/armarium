@@ -95,6 +95,7 @@ func (s *Server) Handler() http.Handler {
 	for _, prefix := range []string{"/opds/v1.2", "/opds/t/{token}/v1.2"} {
 		s.opdsRoutes(prefix, route)
 	}
+	s.kosyncRoutes(route)
 
 	m.Handle("/api/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not found")

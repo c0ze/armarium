@@ -214,7 +214,10 @@ func (s *Server) writeAllowed(w http.ResponseWriter, r *http.Request, p Principa
 	// even when its host is localhost and localhost is in allowed_hosts.
 	own := err == nil && (u.Scheme == "http" || u.Scheme == "https") && config.HostAllowed(s.Cfg.AllowedHosts, u.Host)
 	ok := own
-	if p == Token { // not ambient: a script had to attach it explicitly
+	// KOSync clients send Basic with no Origin. Their X-Auth-User header can't be
+	// added cross-site without a preflight, and /kosync/ answers none.
+	koSync := p == Basic && strings.HasPrefix(r.URL.Path, "/kosync/") && r.Header.Get("X-Auth-User") != ""
+	if p == Token || koSync { // not ambient: a script had to attach it explicitly
 		ok = origin == "" || own || slices.Contains(s.Cfg.CORSOrigins, origin)
 	}
 	if !ok {

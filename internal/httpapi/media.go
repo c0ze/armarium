@@ -306,6 +306,9 @@ func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, it store.Item
 		return
 	}
 	defer f.Close()
+	if it.Format == "epub" && r.Method == http.MethodGet && r.Header.Get("Range") == "" {
+		s.linkDownload(r.Context(), f, it.ID)
+	}
 	http.NewResponseController(w).SetWriteDeadline(time.Now().Add(30 * time.Minute))
 	disp := "attachment"
 	if it.Format == "pdf" && r.URL.Query().Get("inline") == "1" {

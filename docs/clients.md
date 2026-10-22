@@ -127,6 +127,41 @@ and `/opds/v1.2/catalog` for Books. A 404/405 or missing allow-origin header mea
 the running server/proxy has not enabled that origin. TLS, DNS and URL errors
 can also prevent a connection even when CORS is configured correctly.
 
+## CrossPoint Reader (Xteink X3/X4 and others)
+
+[CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader) e-ink
+readers browse Armarium over OPDS and sync reading positions with it over the
+KOReader sync protocol (KOSync). Create one API token for the device under
+**Admin**; it serves both.
+
+- **OPDS:** Settings → System → OPDS Servers → Add Server. URL
+  `http://<host>:8580/opds/v1.2/catalog`, any user name, the token as the
+  password. CrossPoint downloads the EPUB link of each entry; it can't read
+  comics or PDFs. Plain HTTP is fine on your home network: CrossPoint sends
+  the token as Basic auth, the same as it would over HTTPS to a proxy.
+- **Progress sync:** Settings → System → KOReader Sync. **Sync Server URL**
+  `http://<host>:8580/kosync`, any user name, the same token as the password,
+  then **Authenticate** (not **Sign Up**: Armarium has no sign-up). Set
+  **Document Matching** to **Binary**. **Send Document Metadata** is optional
+  (see below).
+- A sync from the reader moves the book's Armarium progress to the uploaded
+  chapter and position, so it shows under "Continue reading" here and in OPDS.
+  Like the web reader's saves, it never moves a book backwards or marks a read
+  book unread.
+- If you read on in Armarium's web reader afterwards, the next sync on the device
+  offers that position, at the start of its chapter.
+- **How Armarium knows the book.** A KOSync client names a book by an id
+  computed from the file. With Binary matching that is KOReader's partial MD5
+  of the file, which Armarium records whenever it serves an EPUB, so books
+  downloaded through Armarium's OPDS match. For books put on the device another
+  way (USB, the Calibre plugin) or with Filename matching, turn on **Send
+  Document Metadata**: Armarium then matches an unknown id by the book's title (and
+  author, when several share it).
+- Positions for a book Armarium can't match are still stored and handed back to
+  any device that asks, like any KOSync server.
+- KOReader itself is not supported yet: it authenticates with an MD5 of the
+  password only, which Armarium can't check against its stored token digests.
+
 ## skriv.ist (Skrivist)
 
 Skrivist's OPDS browser works with Armarium's feeds for EPUBs. Its server-side
