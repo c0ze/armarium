@@ -43,8 +43,9 @@ var docFragment = regexp.MustCompile(`^/body/DocFragment\[(\d+)\]`)
 // ChapterOf turns a KOReader XPointer and overall percentage (0..1) into a
 // 0-based chapter and the position within it (0..1, three decimals). The
 // chapter comes from the XPointer's DocFragment (1-based spine index), else
-// from the percentage; chapters is the spine length, 0 when unknown.
-func ChapterOf(xpath string, pct float64, chapters int) (chapter int, scroll float64) {
+// from the percentage. sizes weighs the chapters the way CrossPoint does (their
+// inflated sizes; all zero means equal weights); empty when unknown.
+func ChapterOf(xpath string, pct float64, sizes []int64) (chapter int, scroll float64) {
 	pct = min(max(pct, 0), 1)
 	chapter = -1
 	if m := docFragment.FindStringSubmatch(xpath); m != nil {
@@ -53,15 +54,54 @@ func ChapterOf(xpath string, pct float64, chapters int) (chapter int, scroll flo
 			chapter = n - 1
 		}
 	}
-	if chapters <= 0 {
+	if len(sizes) == 0 {
 		return max(chapter, 0), 0
 	}
+	w, cum := weights(sizes)
+	target := pct * cum[len(w)]
 	if chapter < 0 {
-		chapter = int(pct * float64(chapters))
+		chapter = len(w) - 1
+		for i := range w {
+			if cum[i+1] > target {
+				chapter = i
+				break
+			}
+		}
 	}
-	chapter = min(chapter, chapters-1)
-	scroll = min(max(pct*float64(chapters)-float64(chapter), 0), 1)
+	chapter = min(chapter, len(w)-1)
+	if w[chapter] > 0 {
+		scroll = min(max((target-cum[chapter])/w[chapter], 0), 1)
+	}
 	return chapter, math.Round(scroll*1000) / 1000
+}
+
+// Percentage is the overall position (0..1) of a place in a chapter, weighed
+// like ChapterOf; 0 when sizes is empty.
+func Percentage(chapter int, scroll float64, sizes []int64) float64 {
+	if len(sizes) == 0 {
+		return 0
+	}
+	w, cum := weights(sizes)
+	chapter = min(max(chapter, 0), len(w)-1)
+	return min((cum[chapter]+min(max(scroll, 0), 1)*w[chapter])/cum[len(w)], 1)
+}
+
+// weights returns the chapter weights (equal when sizes are all zero) and
+// their running totals, cum[i] being the weight before chapter i.
+func weights(sizes []int64) (w, cum []float64) {
+	var total int64
+	for _, n := range sizes {
+		total += max(n, 0)
+	}
+	w, cum = make([]float64, len(sizes)), make([]float64, len(sizes)+1)
+	for i, n := range sizes {
+		w[i] = 1
+		if total > 0 {
+			w[i] = float64(max(n, 0))
+		}
+		cum[i+1] = cum[i] + w[i]
+	}
+	return w, cum
 }
 
 // XPointer is the XPointer of the start of a 0-based chapter.

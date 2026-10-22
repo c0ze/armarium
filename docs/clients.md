@@ -146,8 +146,9 @@ KOReader sync protocol (KOSync). Create one API token for the device under
   (see below).
 - A sync from the reader moves the book's Armarium progress to the uploaded
   chapter and position, so it shows under "Continue reading" here and in OPDS.
-  Like the web reader's saves, it never moves a book backwards or marks a read
-  book unread.
+  The book counts as read once the device reports the end (99.5%). Like the web
+  reader's saves, a sync never moves a book backwards or marks a read book
+  unread.
 - If you read on in Armarium's web reader afterwards, the next sync on the device
   offers that position, at the start of its chapter.
 - **How Armarium knows the book.** A KOSync client names a book by an id

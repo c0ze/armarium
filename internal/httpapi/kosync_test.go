@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/c0ze/armarium/internal/kosync"
@@ -45,8 +46,9 @@ func TestKOSyncAuth(t *testing.T) {
 	if w := e.do(req{path: "/kosync/users/auth", basic: "wrong", headers: koHeaders}); w.Code != 401 {
 		t.Errorf("wrong token: %d", w.Code)
 	}
-	if w := e.do(req{method: "POST", path: "/kosync/users/create", body: `{"username":"x4","password":"p"}`}); w.Code != 403 {
-		t.Errorf("sign-up: %d", w.Code)
+	if w := e.do(req{method: "POST", path: "/kosync/users/create", body: `{"username":"x4","password":"p"}`}); w.Code != 403 ||
+		!strings.Contains(w.Body.String(), "no sign-up") {
+		t.Errorf("sign-up: %d %s", w.Code, w.Body)
 	}
 	if w := e.do(req{path: "/kosync/healthcheck"}); w.Code != 200 {
 		t.Errorf("healthcheck: %d", w.Code)
@@ -66,8 +68,16 @@ func TestKOSyncUploadMovesProgress(t *testing.T) {
 		t.Fatalf("upload = %v", got)
 	}
 	it, _ := e.srv.Store.Item(context.Background(), e.bookID)
-	if it.Progress.Page != 2 || it.Progress.Status != "read" || it.Progress.Locator != `{"chapter":1,"scroll":0.5}` {
-		t.Fatalf("item progress = %+v", it.Progress)
+	// Weighed by the chapters' sizes, as CrossPoint does.
+	sizes := e.srv.chapterSizes(context.Background(), it)
+	if len(sizes) != 2 || sizes[0] == sizes[1] {
+		t.Fatalf("fixture chapter sizes = %v, want two different", sizes)
+	}
+	_, scroll := kosync.ChapterOf("/body/DocFragment[2]/body", 0.75, sizes)
+	wantLoc := fmt.Sprintf(`{"chapter":1,"scroll":%v}`, scroll)
+	// On the last chapter at 75%: still reading.
+	if it.Progress.Page != 2 || it.Progress.Status != "reading" || it.Progress.Locator != wantLoc {
+		t.Fatalf("item progress = %+v, want locator %s", it.Progress, wantLoc)
 	}
 
 	// The upload comes back as uploaded, not echoed as newer Armarium progress.
@@ -84,7 +94,8 @@ func TestKOSyncUploadMovesProgress(t *testing.T) {
 		t.Fatalf("web progress: %d %s", w.Code, w.Body)
 	}
 	got = e.kosync("GET", "/kosync/syncs/progress/"+doc, "")
-	if got["progress"] != "/body/DocFragment[1]/body" || got["percentage"] != 0.125 || got["device"] != "Armarium" {
+	if got["progress"] != "/body/DocFragment[1]/body" || got["percentage"] != kosync.Percentage(0, 0.25, sizes) ||
+		got["device"] != "Armarium" {
 		t.Fatalf("armarium position = %v", got)
 	}
 }
@@ -98,8 +109,14 @@ func TestKOSyncMatchesByMetadata(t *testing.T) {
 		"metadata":{"filename":"John Betancourt - Infection.epub","title":"INFECTION","authors":"John Betancourt"}}`
 	e.kosync("PUT", "/kosync/syncs/progress", body)
 	it, _ := e.srv.Store.Item(context.Background(), cal.ID)
-	if it.Progress.Page != 1 || it.Progress.Status == "unread" {
+	if it.Progress.Page != 1 || it.Progress.Status != "reading" {
 		t.Fatalf("calibre book progress = %+v", it.Progress)
+	}
+	// The end of the book marks it read; the id is linked now, no metadata needed.
+	e.kosync("PUT", "/kosync/syncs/progress", `{"document":"0123456789abcdef0123456789abcdef",
+		"progress":"/body/DocFragment[1]/body","percentage":1,"device":"CrossPoint","device_id":"crosspoint-reader"}`)
+	if it, _ := e.srv.Store.Item(context.Background(), cal.ID); it.Progress.Status != "read" {
+		t.Fatalf("finished book = %+v", it.Progress)
 	}
 }
 

@@ -33,6 +33,9 @@ func TestEPUBParsesMetadataSpineTOCAndCover(t *testing.T) {
 	if err != nil || len(b) == 0 {
 		t.Fatalf("chapter: %v", err)
 	}
+	if sizes := e.ChapterSizes(); len(sizes) != 2 || sizes[0] != int64(len(b)) || sizes[1] == 0 {
+		t.Fatalf("chapter sizes: %v (first chapter is %d bytes)", sizes, len(b))
+	}
 }
 
 func TestResolveHrefRefusesEscapes(t *testing.T) {

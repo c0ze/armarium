@@ -202,6 +202,17 @@ func ResolveHref(dir, href string) (string, bool) {
 	return p, true
 }
 
+// ChapterSizes returns each chapter's inflated size, in spine order.
+func (e *EPUB) ChapterSizes() []int64 {
+	sizes := make([]int64, len(e.Spine))
+	for i, m := range e.Spine {
+		if zf := e.files[e.Manifest[m].Href]; zf != nil {
+			sizes[i] = int64(zf.UncompressedSize64)
+		}
+	}
+	return sizes
+}
+
 // IndexOf returns the manifest index for a resolved zip path.
 func (e *EPUB) IndexOf(p string) (int, bool) { i, ok := e.byPath[p]; return i, ok }
 

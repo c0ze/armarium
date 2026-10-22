@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/c0ze/armarium/internal/formats"
 	"github.com/c0ze/armarium/internal/kosync"
 	"github.com/c0ze/armarium/internal/store"
 )
@@ -16,11 +17,12 @@ import (
 // KOReader sync (KOSync) for CrossPoint Reader: the server URL is <base>/kosync,
 // any user name, an API token as the password (CrossPoint sends it as Basic).
 // See docs/superpowers/specs/2026-10-22-kosync-design.md.
-func (s *Server) kosyncRoutes(route func(string, Access, http.HandlerFunc)) {
-	route("GET /kosync/healthcheck", Public, func(w http.ResponseWriter, r *http.Request) {
+func (s *Server) kosyncRoutes(m *http.ServeMux, route func(string, Access, http.HandlerFunc)) {
+	// Unguarded: they read and change nothing, and the sign-up refusal should say why.
+	m.HandleFunc("GET /kosync/healthcheck", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"state": "OK"})
 	})
-	route("POST /kosync/users/create", Public, func(w http.ResponseWriter, r *http.Request) {
+	m.HandleFunc("POST /kosync/users/create", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "no sign-up: log in with an Armarium API token as the password")
 	})
 	route("GET /kosync/users/auth", Reader, func(w http.ResponseWriter, r *http.Request) {
@@ -57,21 +59,18 @@ func (s *Server) kosyncGet(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// Read on elsewhere in Armarium since the last upload: hand that out.
-		if err == nil && it.Progress.Page > 0 && it.Progress.UpdatedAt > rec.UpdatedAt {
+		if err == nil && it.Format == "epub" && it.Progress.Page > 0 && it.Progress.UpdatedAt > rec.UpdatedAt {
 			chapter, scroll := it.Progress.Page-1, 0.0
 			var loc struct {
 				Chapter *int    `json:"chapter"`
 				Scroll  float64 `json:"scroll"`
 			}
 			if json.Unmarshal([]byte(it.Progress.Locator), &loc) == nil && loc.Chapter != nil && *loc.Chapter >= 0 {
-				chapter, scroll = *loc.Chapter, min(max(loc.Scroll, 0), 1)
+				chapter, scroll = *loc.Chapter, loc.Scroll
 			}
-			pct := 0.0
-			if it.Pages > 0 {
-				pct = min((float64(chapter)+scroll)/float64(it.Pages), 1)
-			}
-			writeJSON(w, http.StatusOK, koProgress{Document: doc, Progress: kosync.XPointer(chapter), Percentage: pct,
-				Device: "Armarium", DeviceID: "armarium", Timestamp: it.Progress.UpdatedAt})
+			writeJSON(w, http.StatusOK, koProgress{Document: doc, Progress: kosync.XPointer(chapter),
+				Percentage: kosync.Percentage(chapter, scroll, s.chapterSizes(r.Context(), it)),
+				Device:     "Armarium", DeviceID: "armarium", Timestamp: it.Progress.UpdatedAt})
 			return
 		}
 	}
@@ -121,16 +120,23 @@ func (s *Server) kosyncPut(w http.ResponseWriter, r *http.Request) {
 		case err != nil:
 			s.fail(w, r, err)
 			return
+		case it.Format != "epub":
+			// A Calibre book whose main format isn't its EPUB: its pages aren't chapters.
 		default:
-			chapter, scroll := kosync.ChapterOf(body.Progress, body.Percentage, it.Pages)
+			chapter, scroll := kosync.ChapterOf(body.Progress, body.Percentage, s.chapterSizes(ctx, it))
 			loc, _ := json.Marshal(map[string]any{"chapter": chapter, "scroll": scroll})
-			p, _, err := s.Store.SaveProgress(ctx, it.ID, it.Pages, store.ProgressUpdate{Page: chapter + 1, Locator: string(loc)})
+			u := store.ProgressUpdate{Page: chapter + 1, Locator: string(loc), Status: koStatus(body.Percentage)}
+			p, applied, err := s.Store.SaveProgress(ctx, it.ID, it.Pages, u)
 			if err != nil {
 				s.fail(w, r, err)
 				return
 			}
-			// Not newer than the progress this upload caused, so it is not handed back as Armarium's own.
-			rec.UpdatedAt = max(rec.UpdatedAt, p.UpdatedAt)
+			// Not newer than the progress this upload caused, so it isn't handed back as
+			// Armarium's own. Only if what was read back is this write: a web save that
+			// landed in between stays newer.
+			if applied && p.Page == u.Page && p.Locator == u.Locator {
+				rec.UpdatedAt = max(rec.UpdatedAt, p.UpdatedAt)
+			}
 		}
 	}
 	if err := s.Store.SaveKOSync(ctx, rec); err != nil {
@@ -138,6 +144,35 @@ func (s *Server) kosyncPut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"document": rec.Document, "timestamp": rec.UpdatedAt})
+}
+
+// koStatus goes by the percentage, not the chapter: a one-chapter EPUB is on
+// its last chapter from the first page.
+func koStatus(pct float64) string {
+	if pct >= 0.995 {
+		return "read"
+	}
+	return "reading"
+}
+
+// chapterSizes weighs an EPUB item's chapters for percentages, as CrossPoint
+// does; equal weights when the book can't be opened, nil when its chapter count
+// is unknown too.
+func (s *Server) chapterSizes(ctx context.Context, it store.Item) []int64 {
+	release, err := s.acquire(ctx)
+	if err == nil {
+		defer release()
+		var e *formats.EPUB
+		var done func()
+		if e, done, err = s.openEPUB(ctx, it); err == nil {
+			defer done()
+			return e.ChapterSizes()
+		}
+	}
+	if it.Pages > 0 {
+		return make([]int64, it.Pages)
+	}
+	return nil
 }
 
 // matchDocument finds the item an unknown document names from the metadata a

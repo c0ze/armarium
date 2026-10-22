@@ -23,7 +23,8 @@ position only goes to a KOReader sync server, so it never reaches Armarium's
 
 ## Non-goals
 
-- Sign-up. `POST /users/create` is refused; credentials are an API token.
+- Sign-up. `POST /users/create` is refused with 403 (unguarded, so the message
+  says why); credentials are an API token.
 - KOReader's own app. It sends only `x-auth-user` / `x-auth-key` (an MD5 of
   the password), which can't be checked against stored SHA-256 token digests.
   CrossPoint also sends HTTP Basic, which is what Armarium checks.
@@ -67,7 +68,9 @@ with N the 1-based spine index, plus an overall `percentage`.
 - Upload: chapter = N − 1 (from the percentage when there's no DocFragment),
   scroll = clamp(percentage × chapters − chapter, 0, 1). Saved with the
   existing monotonic `SaveProgress` (page = chapter + 1, web reader locator
-  `{"chapter","scroll"}`), the same rules as the web reader's saves.
+  `{"chapter","scroll"}`), the same rules as the web reader's saves, except
+  status: "read" only from 99.5%, since a one-chapter EPUB is on its last
+  chapter from the first page.
 - Download: the stored KOSync record, unless the linked item's progress was
   updated after it (then `/body/DocFragment[page]/body`, percentage =
   (chapter + scroll) / chapters, device "Armarium"). After an upload the
