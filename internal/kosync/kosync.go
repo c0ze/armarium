@@ -104,6 +104,20 @@ func weights(sizes []int64) (w, cum []float64) {
 	return w, cum
 }
 
+// PageFor is Armarium's progress page for a place in a book, the web reader's
+// rule (progressFor in web/src/lib/reading.ts): chapter+1, except that the last
+// chapter is page chapters-1 until it is scrolled past 95%, when the book is
+// read. chapters 0 (unknown) gives chapter+1, never read.
+func PageFor(chapter, chapters int, scroll float64) (page int, read bool) {
+	if chapters <= 0 || chapter < chapters-1 {
+		return chapter + 1, false
+	}
+	if scroll > 0.95 {
+		return chapters, true
+	}
+	return chapters - 1, false
+}
+
 // XPointer is the XPointer of the start of a 0-based chapter.
 func XPointer(chapter int) string {
 	return fmt.Sprintf("/body/DocFragment[%d]/body", chapter+1)

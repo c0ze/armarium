@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/c0ze/armarium/internal/formats"
 	"github.com/c0ze/armarium/internal/kosync"
 	"github.com/c0ze/armarium/internal/store"
 )
@@ -68,8 +67,13 @@ func (s *Server) kosyncGet(w http.ResponseWriter, r *http.Request) {
 			if json.Unmarshal([]byte(it.Progress.Locator), &loc) == nil && loc.Chapter != nil && *loc.Chapter >= 0 {
 				chapter, scroll = *loc.Chapter, loc.Scroll
 			}
+			sizes, err := s.chapterSizes(r.Context(), it)
+			if err != nil {
+				s.fail(w, r, err)
+				return
+			}
 			writeJSON(w, http.StatusOK, koProgress{Document: doc, Progress: kosync.XPointer(chapter),
-				Percentage: kosync.Percentage(chapter, scroll, s.chapterSizes(r.Context(), it)),
+				Percentage: kosync.Percentage(chapter, scroll, sizes),
 				Device:     "Armarium", DeviceID: "armarium", Timestamp: it.Progress.UpdatedAt})
 			return
 		}
@@ -123,9 +127,18 @@ func (s *Server) kosyncPut(w http.ResponseWriter, r *http.Request) {
 		case it.Format != "epub":
 			// A Calibre book whose main format isn't its EPUB: its pages aren't chapters.
 		default:
-			chapter, scroll := kosync.ChapterOf(body.Progress, body.Percentage, s.chapterSizes(ctx, it))
+			sizes, err := s.chapterSizes(ctx, it)
+			if err != nil {
+				s.fail(w, r, err)
+				return
+			}
+			chapter, scroll := kosync.ChapterOf(body.Progress, body.Percentage, sizes)
 			loc, _ := json.Marshal(map[string]any{"chapter": chapter, "scroll": scroll})
-			u := store.ProgressUpdate{Page: chapter + 1, Locator: string(loc), Status: koStatus(body.Percentage)}
+			page, read := kosync.PageFor(chapter, len(sizes), scroll)
+			u := store.ProgressUpdate{Page: page, Locator: string(loc), Status: "reading"}
+			if read {
+				u.Status = "read"
+			}
 			p, applied, err := s.Store.SaveProgress(ctx, it.ID, it.Pages, u)
 			if err != nil {
 				s.fail(w, r, err)
@@ -146,33 +159,23 @@ func (s *Server) kosyncPut(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"document": rec.Document, "timestamp": rec.UpdatedAt})
 }
 
-// koStatus goes by the percentage, not the chapter: a one-chapter EPUB is on
-// its last chapter from the first page.
-func koStatus(pct float64) string {
-	if pct >= 0.995 {
-		return "read"
-	}
-	return "reading"
-}
-
 // chapterSizes weighs an EPUB item's chapters for percentages, as CrossPoint
-// does; equal weights when the book can't be opened, nil when its chapter count
-// is unknown too.
-func (s *Server) chapterSizes(ctx context.Context, it store.Item) []int64 {
+// does: equal weights when the book can't be opened, nil when its chapter count
+// is unknown too. Busy (no free archive slot) is an error, not a guess.
+func (s *Server) chapterSizes(ctx context.Context, it store.Item) ([]int64, error) {
 	release, err := s.acquire(ctx)
-	if err == nil {
-		defer release()
-		var e *formats.EPUB
-		var done func()
-		if e, done, err = s.openEPUB(ctx, it); err == nil {
-			defer done()
-			return e.ChapterSizes()
-		}
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	if e, done, err := s.openEPUB(ctx, it); err == nil {
+		defer done()
+		return e.ChapterSizes(), nil
 	}
 	if it.Pages > 0 {
-		return make([]int64, it.Pages)
+		return make([]int64, it.Pages), nil
 	}
-	return nil
+	return nil, nil
 }
 
 // matchDocument finds the item an unknown document names from the metadata a

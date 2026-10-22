@@ -65,15 +65,18 @@ Docs recommend Binary matching plus downloading through Armarium's OPDS.
 CrossPoint's progress is a KOReader XPointer, `/body/DocFragment[N]/body/…`,
 with N the 1-based spine index, plus an overall `percentage`.
 
-- Upload: chapter = N − 1 (from the percentage when there's no DocFragment),
-  scroll = clamp(percentage × chapters − chapter, 0, 1). Saved with the
-  existing monotonic `SaveProgress` (page = chapter + 1, web reader locator
-  `{"chapter","scroll"}`), the same rules as the web reader's saves, except
-  status: "read" only from 99.5%, since a one-chapter EPUB is on its last
-  chapter from the first page.
+- Upload: chapter = N − 1 (from the percentage when there's no DocFragment).
+  The percentage is weighed by the chapters' inflated sizes, as CrossPoint
+  computes it, to get the position within the chapter. Saved with the existing
+  monotonic `SaveProgress` and the web reader's `progressFor` rule: page =
+  chapter + 1, except that the last chapter is page N − 1 until it is past 95%,
+  when the book is read; locator `{"chapter","scroll"}`.
+- When no archive slot is free for reading the chapter sizes, uploads and
+  downloads answer 503 (CrossPoint: "try again later") rather than guess equal
+  weights. Equal weights are used only for an EPUB that can't be opened.
 - Download: the stored KOSync record, unless the linked item's progress was
-  updated after it (then `/body/DocFragment[page]/body`, percentage =
-  (chapter + scroll) / chapters, device "Armarium"). After an upload the
+  updated after it (then `/body/DocFragment[chapter + 1]/body` and the
+  size-weighted percentage of chapter + scroll, device "Armarium"). After an upload the
   record's time is set to at least the progress time it caused, so an upload
   never echoes back as "newer".
 - No record and no newer Armarium progress: 404, which CrossPoint treats as

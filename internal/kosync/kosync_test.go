@@ -77,6 +77,29 @@ func TestPercentage(t *testing.T) {
 	}
 }
 
+func TestPageFor(t *testing.T) {
+	// The web reader's progressFor: the last chapter counts as page N-1 until
+	// it is scrolled past 95%, and only then is the book read.
+	for _, c := range []struct {
+		chapter, chapters int
+		scroll            float64
+		page              int
+		read              bool
+	}{
+		{0, 4, 0.5, 1, false},
+		{3, 4, 0.5, 3, false},
+		{3, 4, 0.96, 4, true},
+		{0, 1, 0.75, 0, false},
+		{0, 1, 0.96, 1, true},
+		{2, 0, 0.5, 3, false}, // chapter count unknown
+	} {
+		page, read := PageFor(c.chapter, c.chapters, c.scroll)
+		if page != c.page || read != c.read {
+			t.Errorf("PageFor(%d, %d, %v) = %d, %v; want %d, %v", c.chapter, c.chapters, c.scroll, page, read, c.page, c.read)
+		}
+	}
+}
+
 func TestXPointer(t *testing.T) {
 	if got := XPointer(2); got != "/body/DocFragment[3]/body" {
 		t.Errorf("XPointer(2) = %q", got)

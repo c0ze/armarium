@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/c0ze/armarium/internal/kosync"
 )
@@ -69,15 +70,15 @@ func TestKOSyncUploadMovesProgress(t *testing.T) {
 	}
 	it, _ := e.srv.Store.Item(context.Background(), e.bookID)
 	// Weighed by the chapters' sizes, as CrossPoint does.
-	sizes := e.srv.chapterSizes(context.Background(), it)
-	if len(sizes) != 2 || sizes[0] == sizes[1] {
-		t.Fatalf("fixture chapter sizes = %v, want two different", sizes)
+	sizes, err := e.srv.chapterSizes(context.Background(), it)
+	if err != nil || len(sizes) != 2 || sizes[0] == sizes[1] {
+		t.Fatalf("fixture chapter sizes = %v, %v; want two different", sizes, err)
 	}
 	_, scroll := kosync.ChapterOf("/body/DocFragment[2]/body", 0.75, sizes)
 	wantLoc := fmt.Sprintf(`{"chapter":1,"scroll":%v}`, scroll)
-	// On the last chapter at 75%: still reading.
-	if it.Progress.Page != 2 || it.Progress.Status != "reading" || it.Progress.Locator != wantLoc {
-		t.Fatalf("item progress = %+v, want locator %s", it.Progress, wantLoc)
+	// Early in the last chapter: page chapters-1 and still reading, as the web reader saves it.
+	if it.Progress.Page != 1 || it.Progress.Status != "reading" || it.Progress.Locator != wantLoc {
+		t.Fatalf("item progress = %+v, want page 1 locator %s", it.Progress, wantLoc)
 	}
 
 	// The upload comes back as uploaded, not echoed as newer Armarium progress.
@@ -87,16 +88,35 @@ func TestKOSyncUploadMovesProgress(t *testing.T) {
 		t.Fatalf("download = %v", got)
 	}
 
-	// Reading on in the web reader makes Armarium's position the newer one.
+	// Reading on in the web reader (an ordinary forward save, no reset) lands
+	// and makes Armarium's position the newer one.
 	w := e.do(req{method: "PUT", path: fmt.Sprintf("/api/items/%d/progress", e.bookID), token: e.token,
-		body: `{"page":1,"locator":"{\"chapter\":0,\"scroll\":0.25}","reset":true}`})
-	if w.Code != 200 {
+		body: `{"page":1,"locator":"{\"chapter\":1,\"scroll\":0.9}"}`})
+	if w.Code != 200 || decode[map[string]any](t, w)["applied"] != true {
 		t.Fatalf("web progress: %d %s", w.Code, w.Body)
 	}
 	got = e.kosync("GET", "/kosync/syncs/progress/"+doc, "")
-	if got["progress"] != "/body/DocFragment[1]/body" || got["percentage"] != kosync.Percentage(0, 0.25, sizes) ||
+	if got["progress"] != "/body/DocFragment[2]/body" || got["percentage"] != kosync.Percentage(1, 0.9, sizes) ||
 		got["device"] != "Armarium" {
 		t.Fatalf("armarium position = %v", got)
+	}
+}
+
+func TestKOSyncBusyIsRetryable(t *testing.T) {
+	e := newEnv(t)
+	doc := e.downloadDigest(e.bookID)
+	// Every archive slot taken: no guessing the chapter weights, ask to retry.
+	e.srv.wait = 10 * time.Millisecond
+	for range cap(e.srv.sem) {
+		e.srv.sem <- struct{}{}
+	}
+	w := e.do(req{method: "PUT", path: "/kosync/syncs/progress", basic: e.token, headers: koHeaders,
+		body: fmt.Sprintf(`{"document":%q,"progress":"/body/DocFragment[1]/body","percentage":0.4,"device":"CrossPoint"}`, doc)})
+	if w.Code != 503 {
+		t.Fatalf("busy upload: %d %s", w.Code, w.Body)
+	}
+	if it, _ := e.srv.Store.Item(context.Background(), e.bookID); it.Progress.Page != 0 {
+		t.Fatalf("busy upload saved progress: %+v", it.Progress)
 	}
 }
 
@@ -109,7 +129,8 @@ func TestKOSyncMatchesByMetadata(t *testing.T) {
 		"metadata":{"filename":"John Betancourt - Infection.epub","title":"INFECTION","authors":"John Betancourt"}}`
 	e.kosync("PUT", "/kosync/syncs/progress", body)
 	it, _ := e.srv.Store.Item(context.Background(), cal.ID)
-	if it.Progress.Page != 1 || it.Progress.Status != "reading" {
+	// A one-chapter book: page 0 until its end, like the web reader.
+	if it.Progress.Page != 0 || it.Progress.Status != "reading" || it.Progress.Locator != `{"chapter":0,"scroll":0.4}` {
 		t.Fatalf("calibre book progress = %+v", it.Progress)
 	}
 	// The end of the book marks it read; the id is linked now, no metadata needed.
