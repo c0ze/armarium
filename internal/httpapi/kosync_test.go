@@ -133,6 +133,18 @@ func TestKOSyncMatchesByMetadata(t *testing.T) {
 	if it.Progress.Page != 0 || it.Progress.Status != "reading" || it.Progress.Locator != `{"chapter":0,"scroll":0.4}` {
 		t.Fatalf("calibre book progress = %+v", it.Progress)
 	}
+	// A web save further into the one chapter (page 0 until the end) is newer
+	// Armarium progress and goes back to the device.
+	w := e.do(req{method: "PUT", path: fmt.Sprintf("/api/items/%d/progress", cal.ID), token: e.token,
+		body: `{"page":0,"status":"reading","locator":"{\"chapter\":0,\"scroll\":0.9}"}`})
+	if w.Code != 200 || decode[map[string]any](t, w)["applied"] != true {
+		t.Fatalf("web save: %d %s", w.Code, w.Body)
+	}
+	if got := e.kosync("GET", "/kosync/syncs/progress/0123456789abcdef0123456789abcdef", ""); got["device"] != "Armarium" ||
+		got["progress"] != "/body/DocFragment[1]/body" {
+		t.Fatalf("one-chapter web position = %v", got)
+	}
+
 	// The end of the book marks it read; the id is linked now, no metadata needed.
 	e.kosync("PUT", "/kosync/syncs/progress", `{"document":"0123456789abcdef0123456789abcdef",
 		"progress":"/body/DocFragment[1]/body","percentage":1,"device":"CrossPoint","device_id":"crosspoint-reader"}`)

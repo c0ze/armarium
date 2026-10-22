@@ -57,9 +57,10 @@ func (s *Server) kosyncGet(w http.ResponseWriter, r *http.Request) {
 			s.fail(w, r, err)
 			return
 		}
-		// Read on elsewhere in Armarium since the last upload: hand that out.
-		if err == nil && it.Format == "epub" && it.Progress.Page > 0 && it.Progress.UpdatedAt > rec.UpdatedAt {
-			chapter, scroll := it.Progress.Page-1, 0.0
+		// Read on elsewhere in Armarium since the last upload: hand that out. Not by
+		// page: a one-chapter book is page 0 until its end.
+		if err == nil && it.Format == "epub" && it.Progress.Status != "unread" && it.Progress.UpdatedAt > rec.UpdatedAt {
+			chapter, scroll := max(it.Progress.Page-1, 0), 0.0
 			var loc struct {
 				Chapter *int    `json:"chapter"`
 				Scroll  float64 `json:"scroll"`
