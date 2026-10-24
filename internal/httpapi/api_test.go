@@ -3,6 +3,7 @@ package httpapi
 import (
 	"bytes"
 	"context"
+	"encoding/xml"
 	"fmt"
 	"net/http"
 	"os"
@@ -151,6 +152,120 @@ func TestOPDSFeedsKeepTheTokenPrefixAndNeverRedirect(t *testing.T) {
 	books := e.do(req{path: base + "/search?q=book"}).Body.String()
 	if !strings.Contains(books, `type="application/epub+zip"`) || strings.Contains(books, "opds-pse/stream") {
 		t.Fatal("epub entry wrong")
+	}
+}
+
+// atomFeed is the part of an OPDS feed the catalogue tests look at.
+type atomFeed struct {
+	Links   []atomLink `xml:"link"`
+	Entries []struct {
+		Title string     `xml:"title"`
+		Links []atomLink `xml:"link"`
+	} `xml:"entry"`
+}
+
+type atomLink struct {
+	Rel  string `xml:"rel,attr"`
+	Href string `xml:"href,attr"`
+}
+
+func (e *env) feed(path string) atomFeed {
+	e.t.Helper()
+	w := e.do(req{path: path})
+	var f atomFeed
+	if w.Code != 200 {
+		e.t.Fatalf("%s: %d", path, w.Code)
+	}
+	if err := xml.Unmarshal(w.Body.Bytes(), &f); err != nil {
+		e.t.Fatalf("%s: %v", path, err)
+	}
+	return f
+}
+
+func (f atomFeed) link(rel string) string {
+	for _, l := range f.Links {
+		if l.Rel == rel {
+			return l.Href
+		}
+	}
+	return ""
+}
+
+func (f atomFeed) titles() []string {
+	out := []string{}
+	for _, en := range f.Entries {
+		out = append(out, en.Title)
+	}
+	return out
+}
+
+func TestOPDSLibraryListsAllTitles(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	comics := e.srv.Cfg.Libraries[0].Root
+	want := []string{}
+	for n := 1; n <= 60; n++ {
+		name := fmt.Sprintf("Issue %d", n)
+		tu.WriteZip(t, comics, "Extra/"+name+".cbz", tu.Entry{Name: "01.png", Data: tu.PNG(8, 12, 10)})
+		want = append(want, name)
+	}
+	want = append(want, "Saga #01", "Saga #02") // sort_title order: "issue 2" before "issue 10"
+	if err := e.srv.Scanner.Run(ctx, ""); err != nil {
+		t.Fatal(err)
+	}
+	libs := map[string]int64{}
+	all, _ := e.srv.Store.Libraries(ctx)
+	for _, l := range all {
+		libs[l.Name] = l.ID
+	}
+	base := "/opds/t/" + e.token + "/v1.2"
+	lib := fmt.Sprintf("%s/libraries/%d", base, libs["Calibre"])
+
+	nav := e.feed(lib)
+	if got := nav.titles(); len(got) < 2 || got[0] != "All titles" || got[1] == "All titles" {
+		t.Fatalf("library entries: %v", got)
+	}
+	if l := nav.Entries[0].Links; len(l) != 1 || l[0].Href != lib+"/titles" || l[0].Rel != "subsection" {
+		t.Fatalf("All titles link: %+v", l)
+	}
+	if got := e.feed(lib + "?offset=50").titles(); len(got) > 0 && got[0] == "All titles" {
+		t.Fatal("All titles repeated on a later page")
+	}
+
+	books := e.feed(lib + "/titles")
+	if got := books.titles(); strings.Join(got, "|") != "Infection|Mobi Only|No Cover File" {
+		t.Fatalf("calibre titles: %v", got)
+	}
+	if books.link("up") != lib || books.link("self") != lib+"/titles" || books.link("start") != base+"/catalog" ||
+		books.link("search") != base+"/search?q={searchTerms}" || books.link("next") != "" {
+		t.Fatalf("calibre title links: %+v", books.Links)
+	}
+
+	lib = fmt.Sprintf("%s/libraries/%d", base, libs["Comics"])
+	first := e.feed(lib + "/titles")
+	next := first.link("next")
+	if len(first.Entries) != opdsPerPage || next != lib+"/titles?offset=50" || first.link("previous") != "" {
+		t.Fatalf("first page: %d entries, next %q", len(first.Entries), next)
+	}
+	second := e.feed(next)
+	if second.link("next") != "" || second.link("previous") != lib+"/titles?offset=0" {
+		t.Fatalf("second page links: %+v", second.Links)
+	}
+	if got := append(first.titles(), second.titles()...); strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("comic titles:\n got %v\nwant %v", got, want)
+	}
+	for _, en := range append(first.Entries, second.Entries...) {
+		for _, l := range en.Links {
+			if !strings.HasPrefix(l.Href, base+"/items/") {
+				t.Fatalf("%s: link left the token prefix: %s", en.Title, l.Href)
+			}
+		}
+	}
+
+	for _, p := range []string{"/libraries/99/titles", "/libraries/0/titles", "/libraries/x/titles"} {
+		if w := e.do(req{path: "/opds/v1.2" + p, basic: e.token}); w.Code != 404 {
+			t.Errorf("%s: %d", p, w.Code)
+		}
 	}
 }
 
