@@ -103,7 +103,7 @@ are ignored in SQL and reported as `applied: false`.
 
 ## 6. OPDS and PanelFlow
 
-- `/opds/v1.2/catalog` → libraries → series (paged navigation feeds) → items (acquisition feed), plus "Continue reading", "Recently added" and search. Each comic entry carries a PSE link `…/items/{id}/pse/{pageNumber}` (0-based, per the PSE spec) with `pse:count` and `pse:lastRead`.
+- `/opds/v1.2/catalog` → libraries → series (paged navigation feeds) → items (acquisition feed), plus "Continue reading", "Recently added" and search. Each library's first page starts with "All titles" (`…/libraries/{id}/titles`), an acquisition feed of that library's items by title. Each comic entry carries a PSE link `…/items/{id}/pse/{pageNumber}` (0-based, per the PSE spec) with `pse:count` and `pse:lastRead`.
 - **Auth for OPDS:** HTTP Basic (any username, token as password), a Bearer header, or the token in the path: `/opds/t/{token}/v1.2/catalog`. Every link keeps the request's prefix, so path-token clients never lose it. `?token=` authenticates a single request; links never carry it. Tokens are stored hashed (SHA-256 of a 256-bit secret) and never logged.
 - Feed-level links come before entries and the first `rel="search"` is a direct `{searchTerms}` template (skrivist.app's parser needs both). See [clients.md](clients.md).
 - **PanelFlow integration.** PanelFlow (and comics.skriv.ist, which shares its frontend) now has an **Armarium mode** on the JSON API above, so no Kavita shim was built. Browser readers call Armarium directly; `cors_origins` lists their origins (no credentials, preflight answered before auth).
