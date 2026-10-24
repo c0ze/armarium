@@ -157,6 +157,8 @@ func TestOPDSFeedsKeepTheTokenPrefixAndNeverRedirect(t *testing.T) {
 
 // atomFeed is the part of an OPDS feed the catalogue tests look at.
 type atomFeed struct {
+	Total   int        `xml:"http://a9.com/-/spec/opensearch/1.1/ totalResults"`
+	Start   int        `xml:"http://a9.com/-/spec/opensearch/1.1/ startIndex"`
 	Links   []atomLink `xml:"link"`
 	Entries []struct {
 		Title string     `xml:"title"`
@@ -206,7 +208,7 @@ func TestOPDSLibraryListsAllTitles(t *testing.T) {
 	want := []string{}
 	for n := 1; n <= 60; n++ {
 		name := fmt.Sprintf("Issue %d", n)
-		tu.WriteZip(t, comics, "Extra/"+name+".cbz", tu.Entry{Name: "01.png", Data: tu.PNG(8, 12, 10)})
+		tu.WriteZip(t, comics, fmt.Sprintf("Extra %d/%s.cbz", n, name), tu.Entry{Name: "01.png", Data: tu.PNG(8, 12, 10)})
 		want = append(want, name)
 	}
 	want = append(want, "Saga #01", "Saga #02") // sort_title order: "issue 2" before "issue 10"
@@ -228,8 +230,8 @@ func TestOPDSLibraryListsAllTitles(t *testing.T) {
 	if l := nav.Entries[0].Links; len(l) != 1 || l[0].Href != lib+"/titles" || l[0].Rel != "subsection" {
 		t.Fatalf("All titles link: %+v", l)
 	}
-	if got := e.feed(lib + "?offset=50").titles(); len(got) > 0 && got[0] == "All titles" {
-		t.Fatal("All titles repeated on a later page")
+	if got := e.feed(lib + "?offset=1").titles(); strings.Join(got, "|") != strings.Join(nav.titles()[1:], "|") {
+		t.Fatalf("later page: %v", got) // All titles is entry 0, so offset 1 starts at the first series
 	}
 
 	books := e.feed(lib + "/titles")
@@ -241,7 +243,21 @@ func TestOPDSLibraryListsAllTitles(t *testing.T) {
 		t.Fatalf("calibre title links: %+v", books.Links)
 	}
 
+	// 61 series: All titles plus 49 series on page one, the other 12 on page two,
+	// and the OpenSearch counters agree with what the pages hold.
 	lib = fmt.Sprintf("%s/libraries/%d", base, libs["Comics"])
+	nav, nav2 := e.feed(lib), e.feed(lib+"?offset=50")
+	if len(nav.Entries) != opdsPerPage || nav.Total != 62 || nav.link("next") != lib+"?offset=50" ||
+		len(nav2.Entries) != 12 || nav2.Start != 51 || nav2.Total != 62 || nav2.link("next") != "" {
+		t.Fatalf("library pages: %d+%d entries, total %d, start %d", len(nav.Entries), len(nav2.Entries), nav.Total, nav2.Start)
+	}
+	seen := map[string]bool{}
+	for _, title := range append(nav.titles()[1:], nav2.titles()...) {
+		if title == "All titles" || seen[title] {
+			t.Fatalf("library pages repeat %q", title)
+		}
+		seen[title] = true
+	}
 	first := e.feed(lib + "/titles")
 	next := first.link("next")
 	if len(first.Entries) != opdsPerPage || next != lib+"/titles?offset=50" || first.link("previous") != "" {

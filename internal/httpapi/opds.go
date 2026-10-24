@@ -106,8 +106,11 @@ func (s *Server) opdsLibrary(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	// "All titles" is entry 0 of the paged list, so offsets and the OpenSearch
+	// counters cover it: series n sits at offset n+1.
 	base, off := opdsBase(r), queryInt(r, "offset", 0, 0, 1<<30)
-	list, total, err := s.Store.SeriesList(r.Context(), id, "", off, opdsPerPage)
+	first := min(off, 1)
+	list, total, err := s.Store.SeriesList(r.Context(), id, "", max(off-1, 0), opdsPerPage-1+first)
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -116,7 +119,7 @@ func (s *Server) opdsLibrary(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	f := opds.Feed{ID: fmt.Sprintf("urn:armarium:library:%d", id), Title: lib.Name, Updated: now, Links: commonLinks(base, self, opds.NavType)}
 	f.Links = append(f.Links, opds.Link{Rel: "up", Href: base + "/catalog", Type: opds.NavType})
-	paging(&f, self, off, total, opds.NavType)
+	paging(&f, self, off, total+1, opds.NavType)
 	if off == 0 {
 		f.Entries = append(f.Entries, opds.Entry{
 			ID: fmt.Sprintf("urn:armarium:library:%d:titles", id), Title: "All titles", Updated: now,
