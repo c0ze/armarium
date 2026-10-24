@@ -6,7 +6,7 @@ guided-view comic readers.
 
 An *armarium* was the cupboard where a medieval monastery kept its books.
 
-**[Project website](https://c0ze.github.io/armarium/)** — why Armarium exists,
+**[Project website](https://armarium.skriv.ist/)** — why Armarium exists,
 basic setup, and reading with Skrivist Books and Comics.
 
 - **Comics:** CBZ and CBR, streamed page by page (OPDS page streaming and a JSON API);
