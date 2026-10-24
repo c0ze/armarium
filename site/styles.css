@@ -143,6 +143,17 @@ p code { background: #e9e7dd; padding: .1em .28em; border-radius: 2px; }
 .setup-tip > .icon { color: var(--amber-dark); }
 .setup-tip p { font-size: 12px; color: var(--muted); }
 .setup-instructions { min-width: 0; }
+.downloads { margin-bottom: 64px; }
+.downloads-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 20px; }
+.downloads-heading h3 { font-size: 43px; }
+.downloads-heading p:not(.eyebrow) { font-size: 12px; color: var(--muted); }
+.download-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.download-card { display: grid; gap: 5px; padding: 20px 22px; border: 1px solid var(--line); border-radius: 3px; background: #fffaf0; color: var(--ink); text-decoration: none; transition: border-color .2s, transform .2s; }
+.download-card:hover { border-color: var(--amber-dark); transform: translateY(-2px); }
+.download-card .micro { font-size: 9px; color: var(--muted); }
+.download-card strong { font-size: 16px; font-weight: 600; }
+.download-card span:last-child { font-size: 11px; color: var(--muted); }
+.download-note { margin-top: 16px; font-size: 12px; color: var(--muted); max-width: 760px; }
 .setup-tabs { display: flex; gap: 24px; border-bottom: 1px solid #c7cbbd; margin-bottom: 28px; }
 .setup-tab { border: 0; border-bottom: 2px solid transparent; padding: 9px 0 13px; background: none; color: var(--muted); font-size: 12px; font-weight: 600; margin-bottom: -1px; }
 .setup-tab:hover { color: var(--ink); }
@@ -245,6 +256,8 @@ pre code { font-size: inherit; overflow-wrap: normal; }
   .feature:not(:nth-child(3n+1)) { padding-left: 24px; }
 }
 @media (max-width: 800px) {
+  .download-grid { grid-template-columns: 1fr 1fr; }
+  .downloads-heading { flex-direction: column; align-items: flex-start; }
   .site-header { min-height: 88px; gap: 18px; flex-wrap: wrap; padding-block: 20px 15px; }
   .site-header nav { order: 3; margin-left: 0; width: 100%; justify-content: space-between; gap: 10px; padding-top: 10px; }
   .header-github { margin-left: auto; border-left: 0; padding-left: 0; }
