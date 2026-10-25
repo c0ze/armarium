@@ -97,7 +97,8 @@ jobs:
         run: |
           iscc="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
           [ -x "$iscc" ] || { choco install innosetup -y --no-progress; }
-          "$iscc" "/DMyAppVersion=${VERSION#v}" "/DSourceDir=..\..\dist\windows" packaging/windows/armarium.iss
+          # Git Bash would rewrite ISCC's /D options as paths.
+          MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' "$iscc" "/DMyAppVersion=${VERSION#v}" "/DSourceDir=..\..\dist\windows" packaging/windows/armarium.iss
           ls -l dist/Armarium-Setup-*.exe
 
       - name: Sign the installer
