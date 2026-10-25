@@ -11,6 +11,7 @@
   import ComicViewer from './views/ComicViewer.svelte';
   import Admin from './views/Admin.svelte';
   import Setup from './views/Setup.svelte';
+  import Settings from './views/Settings.svelte';
 
   let session = $state<Session | null>(null);
   let libraries = $state<Library[]>([]);
@@ -72,6 +73,8 @@
           {#key route.id}<ItemView id={route.id} panelflowUrl={session.panelflowUrl} />{/key}
         {:else if route.name === 'admin'}
           <Admin admin={session.admin} />
+        {:else if route.name === 'settings' && session.admin}
+          <Settings />
         {:else}
           <section class="center"><h1>Not on the shelf</h1><p><a class="button" href="/" use:link>Back to the wall</a></p></section>
         {/if}

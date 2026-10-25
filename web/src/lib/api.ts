@@ -104,6 +104,8 @@ export interface FolderCheck {
 
 export interface SettingsInfo {
   editable: boolean;
+  /** Items per library, by name: what removing one deletes. */
+  items: Record<string, number>;
   settings: Settings;
   derived: { listen: string; allowedHosts: string[]; publicUrl: string };
   passwordFromConfig: boolean;

@@ -59,6 +59,7 @@
   </div>
 
   <div class="foot">
+    {#if admin}<a class="nav" class:on={route.name === 'settings'} href="/settings" use:link><Icon name="settings" /><span>Settings</span></a>{/if}
     {#if admin}<a class="nav" class:on={route.name === 'admin'} href="/admin" use:link><Icon name="admin" /><span>Admin</span></a>{/if}
     {#if admin}<button class="nav out" onclick={onLogout}><Icon name="logout" /><span>Log out</span></button>{/if}
   </div>

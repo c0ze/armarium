@@ -135,6 +135,27 @@ func (s *Store) Libraries(ctx context.Context) ([]Library, error) {
 	return out, rows.Err()
 }
 
+// LibraryItemCounts is how many items each library holds, by name: what
+// removing a library would delete.
+func (s *Store) LibraryItemCounts(ctx context.Context) (map[string]int, error) {
+	rows, err := s.DB.QueryContext(ctx,
+		"SELECT l.name, COUNT(i.id) FROM library l LEFT JOIN item i ON i.library_id = l.id GROUP BY l.id")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]int{}
+	for rows.Next() {
+		var name string
+		var n int
+		if err := rows.Scan(&name, &n); err != nil {
+			return nil, err
+		}
+		out[name] = n
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) Library(ctx context.Context, id int64) (Library, error) {
 	var l Library
 	err := s.DB.QueryRowContext(ctx, "SELECT id, name, root, kind FROM library WHERE id = ?", id).

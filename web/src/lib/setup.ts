@@ -51,3 +51,19 @@ export async function waitFor(check: () => Promise<boolean>, timeoutMs: number, 
     await new Promise((r) => setTimeout(r, everyMs));
   }
 }
+
+/** What a Settings save does to existing libraries: a library still on the
+ * same folder under another name is renamed (keeping its items); removals are
+ * the ones the owner confirmed. */
+export function libraryChanges(
+  before: LibrarySettings[],
+  after: LibrarySettings[],
+  removed: string[],
+): { renames: Record<string, string>; removals: string[] } {
+  const renames: Record<string, string> = {};
+  for (const old of before) {
+    const now = after.find((l) => l.root === old.root);
+    if (now && now.name.trim() !== old.name) renames[old.name] = now.name.trim();
+  }
+  return { renames, removals: [...removed] };
+}

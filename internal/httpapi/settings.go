@@ -60,7 +60,13 @@ func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	counts, err := s.Store.LibraryItemCounts(r.Context())
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
 	out := map[string]any{
+		"items":    counts,
 		"editable": s.editable(),
 		"settings": s.Cfg.Settings(),
 		"derived": map[string]any{

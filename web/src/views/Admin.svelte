@@ -25,6 +25,10 @@
     }
   }
   $effect(() => { if (admin) load(); });
+  // The desktop app's "Pair a phone…" opens /admin#pair.
+  $effect(() => {
+    if (admin && location.hash === '#pair') requestAnimationFrame(() => document.getElementById('pair')?.scrollIntoView());
+  });
 
   function startPolling() {
     if (poll) return;
@@ -138,7 +142,7 @@
     </ul>
   </section>
 
-  <PairPhone onchange={async () => { tokens = await api.tokens(); }} />
+  <div id="pair"><PairPhone onchange={async () => { tokens = await api.tokens(); }} /></div>
 
   <section>
     <div class="bar"><h2>Connecting apps</h2></div>

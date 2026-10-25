@@ -57,8 +57,8 @@ func TestSettingsReadOnlyWithoutHost(t *testing.T) {
 func TestSettingsPutAppliesChange(t *testing.T) {
 	e, h := managedEnv(t)
 	w := e.do(req{path: "/api/settings", cookie: true})
-	if got := decode[map[string]any](t, w); got["editable"] != true {
-		t.Fatalf("managed settings not editable: %v", got)
+	if got := decode[map[string]any](t, w); got["editable"] != true || got["items"].(map[string]any)["Comics"] != float64(2) {
+		t.Fatalf("managed settings: %v", got)
 	}
 	s := e.srv.Cfg.Settings()
 	s.Network = "home"

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultName, passwordProblem, readCode, settingsFor, uniqueName, waitFor } from './setup';
+import { defaultName, libraryChanges, passwordProblem, readCode, settingsFor, uniqueName, waitFor } from './setup';
 
 describe('readCode', () => {
   it('takes the code from the setup link fragment', () => {
@@ -72,5 +72,18 @@ describe('waitFor', () => {
   });
   it('resolves false after the timeout, treating errors as not yet', async () => {
     expect(await waitFor(async () => { throw new Error('down'); }, 20, 5)).toBe(false);
+  });
+});
+
+describe('libraryChanges', () => {
+  const lib = (name: string, root: string) => ({ name, root, kind: 'comics' as const, calibre: false });
+  it('finds renames by folder and keeps explicit removals', () => {
+    const before = [lib('Comics', '/c'), lib('Books', '/b'), lib('Old', '/o')];
+    const after = [lib('Graphic novels', '/c'), lib('Books', '/b'), lib('New', '/n')];
+    expect(libraryChanges(before, after, ['Old'])).toEqual({ renames: { Comics: 'Graphic novels' }, removals: ['Old'] });
+  });
+  it('treats an untouched list as no change', () => {
+    const before = [lib('Comics', '/c')];
+    expect(libraryChanges(before, before, [])).toEqual({ renames: {}, removals: [] });
   });
 });
