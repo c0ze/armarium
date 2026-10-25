@@ -6,3 +6,4 @@ armarium.toml
 .impeccable/refs/
 .impeccable/questions/
 .impeccable/build/
+cmd/armarium-desktop/rsrc_windows_*.syso

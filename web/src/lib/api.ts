@@ -57,7 +57,67 @@ export interface Session {
   authenticated: boolean;
   admin: boolean;
   passwordSet: boolean;
+  /** password_hash in armarium.toml wins over a password set in the browser. */
+  passwordFromConfig: boolean;
+  /** No owner password yet: the setup page finishes installing Armarium. */
+  setupOpen: boolean;
   panelflowUrl: string;
+}
+
+export interface LibrarySettings {
+  name: string;
+  root: string;
+  kind: 'books' | 'comics';
+  calibre: boolean;
+}
+
+/** What setup and Settings change on a desktop install (config.Settings). */
+export interface Settings {
+  libraries: LibrarySettings[];
+  network: 'local' | 'home';
+  tailscale: boolean;
+  port: number;
+  publicUrl: string;
+  extraHosts: string[];
+}
+
+export interface TailscaleStatus {
+  available: boolean;
+  name: string;
+  serving: boolean;
+  conflict: string;
+}
+
+export interface SetupInfo {
+  desktop: boolean;
+  managed: boolean;
+  settings: Settings | null;
+  tailscale?: TailscaleStatus;
+}
+
+export interface FolderCheck {
+  ok: boolean;
+  kind: '' | 'books' | 'comics';
+  calibre: boolean;
+  error: string;
+}
+
+export interface SettingsInfo {
+  editable: boolean;
+  /** Items per library, by name: what removing one deletes. */
+  items: Record<string, number>;
+  settings: Settings;
+  derived: { listen: string; allowedHosts: string[]; publicUrl: string };
+  passwordFromConfig: boolean;
+  snippet: string;
+  tailscale?: TailscaleStatus;
+}
+
+export interface Change {
+  settings: Settings;
+  renames?: Record<string, string>;
+  removals?: string[];
+  startAtLogin?: boolean;
 }
 
 export interface Facet {
@@ -88,6 +148,8 @@ export interface PairReader {
   corsAllowed: boolean;
   /** A Skrivist desktop app (skrivist-<app>://pair) rather than a hosted reader. */
   desktop?: boolean;
+  /** The Skrivist Books phone app, which scans the QR from Add library → Scan QR code. */
+  native?: boolean;
   /** The exact cors_origins entries still to add. */
   missing: string[];
 }
@@ -118,10 +180,14 @@ export class ApiError extends Error {
   }
 }
 
-async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function call<T>(method: string, path: string, body?: unknown, headers: Record<string, string> = {}): Promise<T> {
   // Every write declares JSON, bodyless DELETEs included: the server's CSRF
   // check refuses any other content type.
-  const init: RequestInit = { method, credentials: 'same-origin', headers: method === 'GET' ? {} : { 'Content-Type': 'application/json' } };
+  const init: RequestInit = {
+    method,
+    credentials: 'same-origin',
+    headers: method === 'GET' ? headers : { ...headers, 'Content-Type': 'application/json' },
+  };
   if (body !== undefined) init.body = JSON.stringify(body);
   const res = await fetch(path, init);
   if (res.status === 204) return undefined as T;
@@ -157,7 +223,24 @@ export const api = {
   createToken: (name: string) => call<{ token: Token; secret: string }>('POST', '/api/tokens', { name }),
   deleteToken: (id: number) => call<void>('DELETE', `/api/tokens/${id}`),
   pair: () => call<PairInfo>('GET', '/api/pair'),
+  changePassword: (current: string, next: string) => call<Session>('PUT', '/api/password', { current, new: next }),
+  settings: () => call<SettingsInfo>('GET', '/api/settings'),
+  saveSettings: (change: Change) => call<{ reloadUrl: string }>('PUT', '/api/settings', change),
+  checkFolder: (path: string) => call<FolderCheck>('POST', '/api/settings/check-folder', { path }),
+  chooseFolder: () => call<{ path: string } | undefined>('POST', '/api/settings/folder', {}),
 };
+
+/** The setup API: every call carries the one-time code from the setup link. */
+export function setupApi(code: string) {
+  const h = { 'X-Armarium-Setup': code };
+  return {
+    info: () => call<SetupInfo>('GET', '/api/setup', undefined, h),
+    finish: (body: { password: string; settings: Settings | null; startAtLogin?: boolean }) =>
+      call<Session>('POST', '/api/setup/finish', body, h),
+    checkFolder: (path: string) => call<FolderCheck>('POST', '/api/setup/check-folder', { path }, h),
+    chooseFolder: () => call<{ path: string } | undefined>('POST', '/api/setup/folder', {}, h),
+  };
+}
 
 // Browsers keep pages for a day and covers for a week without asking again. Naming
 // the page order (2: root-first, since v0.5.0) keeps images cached under the old

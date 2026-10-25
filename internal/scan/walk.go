@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/c0ze/armarium/internal/formats"
+	"github.com/c0ze/armarium/internal/fsutil"
 )
 
 // walk finds library files on disk. It walks the resolved root: WalkDir does not
@@ -95,7 +96,7 @@ func insideRoot(realRoot, p string) bool {
 		return false
 	}
 	rel, err := filepath.Rel(realRoot, target)
-	return err == nil && rel != ".." && !strings.HasPrefix(rel, "../")
+	return err == nil && fsutil.Inside(rel)
 }
 
 // retryable reports whether a file's format can yield pages when reopened.

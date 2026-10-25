@@ -12,7 +12,7 @@ import (
 // libraryID resolves a configured library name. Run `armarium scan` first so the
 // items the importer matches against exist.
 func (a *app) libraryID(ctx context.Context, name string) (int64, error) {
-	libs, err := a.store.Libraries(ctx)
+	libs, err := a.Store.Libraries(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -36,7 +36,7 @@ func (a *app) importSkrivist(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	res, err := importer.Skrivist(ctx, a.store, id, *db)
+	res, err := importer.Skrivist(ctx, a.Store, id, *db)
 	if err == nil {
 		fmt.Printf("progress rows: %d, tagged items: %d, unmatched: %d\n", res.Progress, res.Tags, res.Skipped)
 	}
@@ -56,7 +56,7 @@ func (a *app) importKavita(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	res, err := importer.Kavita(ctx, a.store, id, *db, *root)
+	res, err := importer.Kavita(ctx, a.Store, id, *db, *root)
 	if err == nil {
 		fmt.Printf("progress rows: %d, unmatched: %d\n", res.Progress, res.Skipped)
 	}

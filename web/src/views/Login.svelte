@@ -32,10 +32,7 @@
       {#if error}<p class="error" role="alert">{error}</p>{/if}
     </form>
   {:else}
-    <p class="muted">
-      No password is set. Run <code>armarium hash-password</code>, put the result in
-      <code>password_hash</code> in <code>armarium.toml</code> (or <code>ARMARIUM_PASSWORD_HASH</code>), and restart.
-    </p>
+    <p class="muted">No password is set yet. Open the setup link from Armarium's menu or log, or run <code>armarium password</code>.</p>
   {/if}
 </main>
 

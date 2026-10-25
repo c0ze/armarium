@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"mime"
+	"net"
 	"net/http"
 	"net/url"
 	"slices"
@@ -60,9 +61,25 @@ func (s *Server) base(next http.Handler) http.Handler {
 	})
 }
 
+// hostAllowed is the Host allowlist, plus this machine's own IP addresses when
+// a managed config serves devices at home.
+func (s *Server) hostAllowed(hostport string) bool {
+	if config.HostAllowed(s.Cfg.AllowedHosts, hostport) {
+		return true
+	}
+	if !s.Cfg.AllowLocalAddresses {
+		return false
+	}
+	host := hostport
+	if h, _, err := net.SplitHostPort(hostport); err == nil {
+		host = h
+	}
+	return config.LocalAddress(host)
+}
+
 func (s *Server) hosts(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/healthz" && !config.HostAllowed(s.Cfg.AllowedHosts, r.Host) {
+		if r.URL.Path != "/healthz" && !s.hostAllowed(r.Host) {
 			http.Error(w, "unknown host", http.StatusMisdirectedRequest)
 			return
 		}
@@ -212,7 +229,7 @@ func (s *Server) writeAllowed(w http.ResponseWriter, r *http.Request, p Principa
 	u, err := url.Parse(origin)
 	// A custom-scheme webview is a token client, not Armarium's own web UI,
 	// even when its host is localhost and localhost is in allowed_hosts.
-	own := err == nil && (u.Scheme == "http" || u.Scheme == "https") && config.HostAllowed(s.Cfg.AllowedHosts, u.Host)
+	own := err == nil && (u.Scheme == "http" || u.Scheme == "https") && s.hostAllowed(u.Host)
 	ok := own
 	// KOSync clients send Basic with no Origin. Their X-Auth-User header can't be
 	// added cross-site without a preflight, and /kosync/ answers none.

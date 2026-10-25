@@ -10,6 +10,8 @@
   import BookReader from './views/BookReader.svelte';
   import ComicViewer from './views/ComicViewer.svelte';
   import Admin from './views/Admin.svelte';
+  import Setup from './views/Setup.svelte';
+  import Settings from './views/Settings.svelte';
 
   let session = $state<Session | null>(null);
   let libraries = $state<Library[]>([]);
@@ -26,12 +28,12 @@
   refresh();
 
   const route = $derived(router.route);
-  const bare = $derived(route.name === 'reader' || route.name === 'viewer' || route.name === 'login');
+  const bare = $derived(route.name === 'reader' || route.name === 'viewer' || route.name === 'login' || route.name === 'setup');
   // The wall is the library view with no filters at all.
   const wall = $derived(route.name === 'library' && [...route.params.keys()].length === 0);
 
   $effect(() => {
-    if (session && !session.authenticated && route.name !== 'login') navigate('/login', true);
+    if (session && !session.setupOpen && !session.authenticated && route.name !== 'login' && route.name !== 'setup') navigate('/login', true);
   });
 
   async function logout() {
@@ -43,7 +45,11 @@
 {#if failure}
   <main class="center"><h1>Unreachable</h1><p class="error">{failure}</p></main>
 {:else if session}
-  {#if route.name === 'login'}
+  {#if session.setupOpen}
+    <Setup />
+  {:else if route.name === 'setup'}
+    <Setup done />
+  {:else if route.name === 'login'}
     <Login {session} onLogin={async () => { await refresh(); navigate('/', true); }} />
   {:else if !session.authenticated}
     <p class="center muted">Redirecting to login…</p>
@@ -67,6 +73,8 @@
           {#key route.id}<ItemView id={route.id} panelflowUrl={session.panelflowUrl} />{/key}
         {:else if route.name === 'admin'}
           <Admin admin={session.admin} />
+        {:else if route.name === 'settings' && session.admin}
+          <Settings />
         {:else}
           <section class="center"><h1>Not on the shelf</h1><p><a class="button" href="/" use:link>Back to the wall</a></p></section>
         {/if}

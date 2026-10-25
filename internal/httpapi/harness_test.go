@@ -37,7 +37,10 @@ type env struct {
 
 var passwordHash = func() string { h, _ := auth.HashPassword(testPassword); return h }()
 
-func newEnv(t *testing.T) *env {
+func newEnv(t *testing.T) *env { t.Helper(); return newEnvWith(t, nil) }
+
+// newEnvWith lets a test change the config before the server starts.
+func newEnvWith(t *testing.T, edit func(*config.Config)) *env {
 	t.Helper()
 	comics, books, cal := t.TempDir(), t.TempDir(), t.TempDir()
 	tu.WriteCalibre(t, cal,
@@ -71,6 +74,9 @@ func newEnv(t *testing.T) *env {
 		{Name: "Books", Root: books, Kind: "books", Include: []string{"*_downloads"}},
 		{Name: "Calibre", Root: cal, Kind: "books", Calibre: true},
 	}
+	if edit != nil {
+		edit(&cfg)
+	}
 	st, err := store.Open(filepath.Join(cfg.DataDir, "armarium.db"))
 	if err != nil {
 		t.Fatal(err)
@@ -89,6 +95,7 @@ func newEnv(t *testing.T) *env {
 	}
 	cv := &covers.Service{Dir: filepath.Join(cfg.DataDir, "covers"), MaxPixels: 1 << 24, MaxBytes: 1 << 20}
 	srv := New(cfg, st, sc, cv, nil, log)
+	t.Cleanup(srv.Close) // before the temp dirs go: Windows can't delete open files
 	e := &env{t: t, srv: srv, h: srv.Handler(), items: map[string]store.Item{}}
 
 	e.token = auth.NewSecret()
@@ -153,9 +160,11 @@ func (e *env) do(q req) *httptest.ResponseRecorder {
 }
 
 // login performs a real password login and keeps the session cookie.
-func (e *env) login() {
+func (e *env) login() { e.t.Helper(); e.login2(testPassword) }
+
+func (e *env) login2(password string) {
 	e.t.Helper()
-	w := e.do(req{method: "POST", path: "/api/login", body: `{"password":"` + testPassword + `"}`, origin: "https://armarium.test"})
+	w := e.do(req{method: "POST", path: "/api/login", body: `{"password":"` + password + `"}`, origin: "https://armarium.test"})
 	if w.Code != 200 {
 		e.t.Fatalf("login: %d %s", w.Code, w.Body)
 	}

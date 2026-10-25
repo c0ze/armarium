@@ -72,3 +72,15 @@ func TestRemoveLibraryCascades(t *testing.T) {
 		t.Fatalf("second remove: %v", err)
 	}
 }
+
+func TestLibraryItemCounts(t *testing.T) {
+	s := openTest(t)
+	lib, _ := seed(t, s, "A/1.cbz", "A/2.cbz", "B/3.cbz")
+	counts, err := s.LibraryItemCounts(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if counts[lib.Name] != 3 {
+		t.Fatalf("counts %v", counts)
+	}
+}

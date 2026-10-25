@@ -111,3 +111,9 @@ input:focus, select:focus { outline: none; border-color: var(--amber); }
 .muted { color: var(--text-2); }
 .error { color: var(--danger); }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Segmented control: a hairline group; the selected segment is raised, never amber. */
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; padding: 0.72rem 1rem; color: var(--text-2); }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button.on { color: var(--text); background: var(--raised); }

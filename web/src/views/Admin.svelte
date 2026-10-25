@@ -3,6 +3,7 @@
   import { api, type Library, type ScanStatus, type Token } from '../lib/api';
   import Icon from './Icon.svelte';
   import PairPhone from './PairPhone.svelte';
+  import { link } from '../lib/router.svelte';
 
   let { admin }: { admin: boolean } = $props();
   let libraries = $state<Library[]>([]);
@@ -25,6 +26,10 @@
     }
   }
   $effect(() => { if (admin) load(); });
+  // The desktop app's "Pair a phone…" opens /admin#pair.
+  $effect(() => {
+    if (admin && location.hash === '#pair') requestAnimationFrame(() => document.getElementById('pair')?.scrollIntoView());
+  });
 
   function startPolling() {
     if (poll) return;
@@ -87,7 +92,7 @@
       <h2>Libraries</h2>
       <button disabled={status?.running} onclick={() => scan()}>{status?.running ? 'Scanning' : 'Scan all'}</button>
     </div>
-    <p class="note muted">Libraries come from <code>armarium.toml</code>. A scan opens only new and changed files.</p>
+    <p class="note muted">Libraries are listed in <a href="/settings" use:link>Settings</a>. A scan opens only new and changed files.</p>
     {#if status && status.startedAt}
       <p class="scan" class:live={status.running}>
         {#if status.running}<span class="pulse" aria-hidden="true"></span>Scanning now{:else}Last scan {when(status.finishedAt)}{/if}
@@ -138,7 +143,7 @@
     </ul>
   </section>
 
-  <PairPhone onchange={async () => { tokens = await api.tokens(); }} />
+  <div id="pair"><PairPhone onchange={async () => { tokens = await api.tokens(); }} /></div>
 
   <section>
     <div class="bar"><h2>Connecting apps</h2></div>

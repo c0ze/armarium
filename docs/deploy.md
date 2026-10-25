@@ -1,5 +1,9 @@
 # Deploying Armarium
 
+On a Mac or a Windows PC, use the installer instead: see
+[install-mac.md](install-mac.md) and [install-windows.md](install-windows.md).
+This page is for NAS boxes and servers.
+
 Armarium is one static binary with the web UI inside. Run it in Docker or run the
 binary directly; either way it needs a config file and a writable data folder.
 Library folders can (and should) be read-only.
@@ -22,13 +26,16 @@ curl -L -o armarium.toml https://raw.githubusercontent.com/c0ze/armarium/main/de
    container), `listen = "0.0.0.0:8580"`, and every host name you will use in
    `allowed_hosts`. To read on a phone, also set `public_url` (your HTTPS address)
    and `cors_origins` (see [Phones](#phones) below).
-3. Set the owner password:
+3. `docker compose up -d`, then set the owner password in the browser. The log
+   has a one-time setup link:
    ```bash
-   docker run --rm -i ghcr.io/c0ze/armarium hash-password
+   docker logs armarium 2>&1 | grep "Finish setup"
    ```
-   and paste the output into `password_hash`.
-4. `docker compose up -d`, open `http://<host>:8580`, log in, and run a scan
-   from **Admin**.
+   Open it with this server's address in place of `127.0.0.1` (that address
+   must be in `allowed_hosts`), choose the password, and run a scan from
+   **Admin**. The link works until a password exists; a new one is logged at
+   every start. (You can still set `password_hash` from
+   `armarium hash-password` instead; it wins over the one set in the browser.)
 
 Updating: `docker compose pull && docker compose up -d`. The database migrates
 itself on start.
@@ -57,10 +64,30 @@ The same compose file works as a Container Manager **Project**:
 
 To update, pull the new image in Container Manager and rebuild the project.
 
+## First-run setup and managed configs
+
+While no owner password exists (no `password_hash` and none set in the
+browser), Armarium logs `Finish setup: http://…/setup#code=…`. The code is
+random, kept only in memory, changes at every start, and stops working once a
+password is set; wrong codes count against the login limits. Setup on a server
+only sets the password, stored in the database: Armarium never rewrites a
+hand-written `armarium.toml` (which Docker usually mounts read-only).
+
+The desktop apps write their own config, marked by a `[desktop]` table and a
+first-line comment. Its listen address, host names, public URL and
+`cors_origins` are worked out at every start from the choices in Settings, so
+edit those in Settings rather than in the file.
+
 ## Phones
 
-Skrivist Comics and Skrivist Books are web apps served over HTTPS, so they can only
-load an HTTPS Armarium, and only from origins Armarium allows:
+The Skrivist Books app (iPhone, iPad, Android) can use plain HTTP on your home
+network: pair it from **Admin → Pair a phone → Skrivist Books app** and scan the
+code from the app's Add library → Scan QR code. Set `public_url` to the address
+phones use (for example `http://192.168.1.10:8580`); its host must be in
+`allowed_hosts`.
+
+The Skrivist Comics and Skrivist Books web readers are served over HTTPS, so they
+can only load an HTTPS Armarium, and only from origins Armarium allows:
 
 ```toml
 allowed_hosts = ["books.example.com"]
@@ -73,8 +100,8 @@ cors_origins  = [
 
 Restart, then **Admin → Pair a phone**: pick a reader and scan the QR code with the
 phone's camera. Admin warns when `public_url` is missing, points at this computer,
-or a reader's origin is missing from `cors_origins`, and refuses to pair over plain
-HTTP. More in [clients.md](clients.md#pairing-a-phone).
+or a reader's origin is missing from `cors_origins`, and pairs the web readers only
+over HTTPS. More in [clients.md](clients.md#pairing-a-phone).
 
 The Mac and Windows apps pair from **Admin → This computer** instead, and can use
 plain HTTP on your network ([clients.md](clients.md#pairing-this-computer)).
@@ -90,21 +117,25 @@ you already use.
 Armarium keeps only an argon2id hash of it, so it can't be recovered, only replaced:
 
 ```bash
-docker exec -i armarium /armarium hash-password      # type the new password, press Enter
+docker exec -it armarium /armarium password      # type the new password twice
 ```
 
-Paste the printed hash into `password_hash` in `armarium.toml` and restart the
-container (`docker compose restart`). Without Docker, run `armarium hash-password`
-instead. API tokens are unaffected.
+Without Docker, run `armarium password`. This stores the new password in the
+database and logs out every web UI session; API tokens are unaffected.
+
+If `password_hash` is set in `armarium.toml`, that one wins and `armarium
+password` refuses. Either remove it and use `armarium password`, or replace it
+with the output of `armarium hash-password` and restart.
 
 ## Binary and systemd
 
 Download the binary for your platform from the GitHub release, or build it
 (`make`, needs Go and Node).
 
-On macOS, use the universal DMG (Apple Silicon and Intel). It is signed,
-notarized, and stapled; mount it and copy `armarium` and the configuration example
-to a folder of your choice. Run the commands from Terminal.
+On macOS the command line is inside the app from the DMG, at
+`Armarium.app/Contents/Helpers/armarium`; see
+[install-mac.md](install-mac.md#for-terminal-users). It runs a server from a
+hand-written config like any other build.
 
 On Linux, install the binary and systemd service:
 
@@ -126,6 +157,7 @@ armarium token list | rm <name>
 armarium library list             libraries in the database, configured or not
 armarium library rename <old> <new>   keep a library's items under a new name
 armarium library rm <name>        delete a library with its items and progress
+armarium password                 set the owner password (stored in the database)
 armarium hash-password            argon2id hash of a password read from stdin
 armarium import-kavita --db kavita.db --library <name> --root <path Kavita saw>
 armarium import-skrivist --db reader_index.db --library <name>

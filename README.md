@@ -20,9 +20,11 @@ basic setup, and reading with Skrivist Books and Comics.
   by the web UI, OPDS page streaming and connected readers.
 - **Web UI:** library grid with search and filters, an EPUB reader, a quick comic
   viewer, and an admin page for scanning and API tokens. Works on phones.
-- **Phone pairing:** Admin shows a QR code; scan it with the phone's camera and
-  [Skrivist Comics](https://comics.skriv.ist) or [Skrivist Books](https://books.skriv.ist)
-  opens with your library filled in; tap Connect. No addresses or tokens to type.
+- **Installers for Mac and Windows** with a setup page in the browser: pick your
+  folders and who can read, set a password, done.
+- **Phone pairing:** Admin shows a QR code for the Skrivist Books app or the
+  [Skrivist Comics](https://comics.skriv.ist) and [Skrivist Books](https://books.skriv.ist)
+  web readers; no addresses or tokens to type.
 - **Light on hardware:** one static binary with pure-Go SQLite, about 30–50 MB of
   memory while scanning ten thousand books, incremental scans that only open new or
   changed files, and no background indexing unless you ask for it.
@@ -34,31 +36,44 @@ basic setup, and reading with Skrivist Books and Comics.
 What it is not: a metadata manager, a scraper, a multi-user service or a store.
 Libraries are mounted read-only; Armarium only writes to its data folder.
 
-## Quick start
+## Install
 
-```bash
-docker run --rm -i ghcr.io/c0ze/armarium hash-password   # owner password hash
-```
+**On a Mac or a Windows PC:** download the installer, open it, and finish setting
+up in your browser: an owner password, your folders, and who can read. No
+Terminal and no configuration file.
 
-Then follow [docs/deploy.md](docs/deploy.md) for Docker Compose, Synology and
-systemd. Every setting is explained in
-[deploy/armarium.example.toml](deploy/armarium.example.toml).
+- **Mac** (macOS 13 or later, Apple silicon or Intel): `Armarium-X.Y.Z-macOS.dmg`,
+  signed and notarized. Guide: [docs/install-mac.md](docs/install-mac.md).
+- **Windows** (10 or 11, 64-bit): `Armarium-Setup-X.Y.Z-x64.exe`, no administrator
+  rights needed. Guide: [docs/install-windows.md](docs/install-windows.md).
+
+Both are on the [latest release](https://github.com/c0ze/armarium/releases/latest)
+and [armarium.skriv.ist](https://armarium.skriv.ist/). Armarium then runs in the
+menu bar or the taskbar's notification area while you're logged in.
+
+**On a NAS or a server** (Docker, Synology, Linux with systemd): see
+[docs/deploy.md](docs/deploy.md). Start the container, open the setup link from
+its log (`docker logs armarium`), and set the owner password there. Every
+setting is explained in [deploy/armarium.example.toml](deploy/armarium.example.toml).
 
 ### Read on your phone
 
-1. Put Armarium behind HTTPS (a reverse proxy such as Synology's, Caddy or
-   Tailscale Serve) and set three things in `armarium.toml`:
-   ```toml
-   allowed_hosts = ["armarium.example.com"]
-   public_url    = "https://armarium.example.com"
-   cors_origins  = [
-     "https://comics.skriv.ist", "https://books.skriv.ist",
-     "tauri://localhost", "http://tauri.localhost", "https://tauri.localhost",
-   ]
-   ```
-2. Restart, log in, open **Admin → Pair a phone** and pick Skrivist Comics or
-   Skrivist Books.
-3. Point the phone's camera at the QR code, open the link, tap **Connect**.
+- **At home, no HTTPS needed:** in the desktop app's Settings, choose **Devices
+  at home**. Then **Pair a phone** (in the menu or Admin), pick **Skrivist Books
+  app**, and scan the QR code from the Books app (Add library → Scan QR code).
+- **Anywhere, with Tailscale:** tick **Also from anywhere, with Tailscale** in
+  Settings; Armarium sets up a private HTTPS address with `tailscale serve`.
+- **Your own HTTPS address** (a reverse proxy on a NAS, for example): set three
+  things in `armarium.toml`:
+  ```toml
+  allowed_hosts = ["armarium.example.com"]
+  public_url    = "https://armarium.example.com"
+  cors_origins  = [
+    "https://comics.skriv.ist", "https://books.skriv.ist",
+    "tauri://localhost", "http://tauri.localhost", "https://tauri.localhost",
+  ]
+  ```
+  The web readers (comics.skriv.ist, books.skriv.ist) need HTTPS.
 
 Each pairing gets its own token; revoke it under API tokens in Admin to unpair.
 Details in [docs/clients.md](docs/clients.md#pairing-a-phone).
@@ -80,8 +95,8 @@ From source (Go 1.26+, Node 22+):
 ```bash
 make                      # builds web/dist and bin/armarium
 cp deploy/armarium.example.toml armarium.toml
-bin/armarium hash-password
-bin/armarium serve        # http://127.0.0.1:8580
+bin/armarium serve        # logs a setup link for the owner password
+make desktop              # the desktop app for this machine (cgo on macOS)
 ```
 
 ## Apps

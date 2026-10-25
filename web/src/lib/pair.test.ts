@@ -31,6 +31,11 @@ describe('desktop pairing', () => {
     expect(canPair({ desktop: false }, true)).toBe(false);
     expect(canPair({}, false)).toBe(true);
   });
+
+  it('allows plain HTTP for the native Books app, which reaches the home network itself', () => {
+    expect(canPair({ native: true }, true)).toBe(true);
+    expect(canPair({}, true)).toBe(false);
+  });
 });
 
 describe('pairTokenName', () => {

@@ -5,6 +5,7 @@ import (
 	"context"
 	"io/fs"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/netip"
 	"time"
@@ -23,6 +24,9 @@ type Server struct {
 	Covers  *covers.Service
 	UI      fs.FS // built web app; may be nil
 	Log     *slog.Logger
+	Host    Host // the desktop app; nil when started from the command line
+	// SetupCode opens first-run setup while no owner password exists.
+	SetupCode string
 
 	limits  formats.Limits
 	comics  *formats.Cache[formats.Container]
@@ -31,6 +35,8 @@ type Server struct {
 	wait    time.Duration // how long a request waits for a slot before 503
 	logins  *loginLimiter
 	proxies []netip.Prefix // trusted_proxies
+	// scanning reports a running scan; tests replace it.
+	scanning func() bool
 }
 
 func New(cfg config.Config, st *store.Store, sc *scan.Scanner, cv *covers.Service, ui fs.FS, log *slog.Logger) *Server {
@@ -44,10 +50,18 @@ func New(cfg config.Config, st *store.Store, sc *scan.Scanner, cv *covers.Servic
 		wait:    10 * time.Second,
 		proxies: cfg.ProxyPrefixes(),
 	}
+	s.scanning = func() bool { return false }
 	if sc != nil {
 		sc.OnChange = s.Forget
+		s.scanning = func() bool { return sc.Status().Running }
 	}
 	return s
+}
+
+// Close closes the archives the server keeps open.
+func (s *Server) Close() {
+	s.comics.Clear()
+	s.books.Clear()
 }
 
 // Forget drops cached open archives for an item whose file changed.
@@ -87,6 +101,15 @@ func (s *Server) Handler() http.Handler {
 	route("POST /api/tokens", Admin, s.createToken)
 	route("DELETE /api/tokens/{id}", Admin, s.deleteToken)
 	route("GET /api/pair", Admin, s.getPair)
+	route("PUT /api/password", Admin, s.changePassword)
+	route("GET /api/setup", Public, s.setupGate(s.getSetup))
+	route("POST /api/setup/finish", Public, s.setupGate(s.finishSetup))
+	route("POST /api/setup/check-folder", Public, s.setupGate(s.checkFolder))
+	route("POST /api/setup/folder", Public, s.setupGate(s.chooseFolder))
+	route("GET /api/settings", Admin, s.getSettings)
+	route("PUT /api/settings", Admin, s.putSettings)
+	route("POST /api/settings/check-folder", Admin, s.checkFolder)
+	route("POST /api/settings/folder", Admin, s.chooseFolder)
 
 	m.HandleFunc("GET /read/base.css", serveBaseCSS)
 	route("GET /read/{id}/chapter/{n}", Reader, s.getChapter)
@@ -108,8 +131,16 @@ func (s *Server) Handler() http.Handler {
 
 // Serve runs the HTTP server until ctx is cancelled.
 func (s *Server) Serve(ctx context.Context) error {
+	ln, err := net.Listen("tcp", s.Cfg.Listen)
+	if err != nil {
+		return err
+	}
+	return s.ServeListener(ctx, ln)
+}
+
+// ServeListener serves on ln until ctx is cancelled.
+func (s *Server) ServeListener(ctx context.Context, ln net.Listener) error {
 	srv := &http.Server{
-		Addr:              s.Cfg.Listen,
 		Handler:           s.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
@@ -117,7 +148,7 @@ func (s *Server) Serve(ctx context.Context) error {
 		MaxHeaderBytes:    16 << 10,
 	}
 	errc := make(chan error, 1)
-	go func() { errc <- srv.ListenAndServe() }()
+	go func() { errc <- srv.Serve(ln) }()
 	select {
 	case err := <-errc:
 		return err

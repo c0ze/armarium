@@ -109,10 +109,6 @@
   .head { display: flex; align-items: baseline; gap: 1.5rem; flex-wrap: wrap; padding: 2.8rem 0 1.4rem; }
   h1 { font-size: clamp(3rem, 5vw, 4.6rem); }
   .tools { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; padding-bottom: 1.6rem; border-bottom: 1px solid var(--line); margin-bottom: 1.8rem; }
-  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
-  .seg button { border: 0; border-radius: 0; padding: 0.72rem 1rem; color: var(--text-2); }
-  .seg button + button { border-left: 1px solid var(--line); }
-  .seg button.on { color: var(--text); background: var(--raised); }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: 1.6rem 1.1rem; }
   .more { display: flex; justify-content: center; margin: 2.4rem 0 3rem; }
   .empty { margin: 4rem 0; text-align: center; }

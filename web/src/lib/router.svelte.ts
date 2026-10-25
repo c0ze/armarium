@@ -2,7 +2,7 @@
 // app shell, so deep links and reloads work.
 
 export interface Route {
-  name: 'library' | 'series' | 'item' | 'reader' | 'viewer' | 'admin' | 'login' | 'notfound';
+  name: 'library' | 'series' | 'item' | 'reader' | 'viewer' | 'admin' | 'settings' | 'setup' | 'login' | 'notfound';
   id: number;
   params: URLSearchParams;
 }
@@ -21,6 +21,8 @@ function parse(): Route {
     case 'viewer':
       return valid ? { name: parts[0] as Route['name'], id, params } : { name: 'notfound', id: 0, params };
     case 'admin':
+    case 'settings':
+    case 'setup':
     case 'login':
       return { name: parts[0] as Route['name'], id: 0, params };
   }

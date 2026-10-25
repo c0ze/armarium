@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/c0ze/armarium/internal/fsutil"
 	_ "modernc.org/sqlite"
 )
 
@@ -113,10 +114,7 @@ func rank(format string) int {
 	return len(preference)
 }
 
-func safeRel(p string) bool {
-	c := path.Clean(p)
-	return p != "" && c != "." && c != ".." && !strings.HasPrefix(c, "../") && !path.IsAbs(c)
-}
+func safeRel(p string) bool { return fsutil.SafeRelSlash(p) }
 
 func each(ctx context.Context, db *sql.DB, q string, fn func(*sql.Rows) error) error {
 	rows, err := db.QueryContext(ctx, q)
