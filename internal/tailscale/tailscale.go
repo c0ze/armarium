@@ -65,3 +65,73 @@ func parseName(statusJSON []byte) string {
 	}
 	return strings.ToLower(strings.TrimSuffix(st.Self.DNSName, "."))
 }
+
+// ServeState is how `tailscale serve` stands on https:443 for Armarium.
+type ServeState struct {
+	Owned    bool   // "/" proxies to Armarium
+	Conflict string // why Armarium won't put itself on "/", "" when it may
+}
+
+// Conflict is what the owner reads when "/" on https:443 is taken.
+const Conflict = "Tailscale already serves something else at the root of this computer's address. Armarium left it alone."
+
+// Serve reports the serve setup for the Armarium at target
+// (http://127.0.0.1:<port>).
+func Serve(ctx context.Context, target string) (ServeState, error) {
+	out, err := run(ctx, "serve", "status", "--json")
+	if err != nil {
+		return ServeState{}, err
+	}
+	return parseServe(out, target)
+}
+
+// parseServe reads `tailscale serve status --json`. Other paths on 443 (such
+// as /tincan) can share the address; only "/" or a raw TCP forward on 443
+// is in the way.
+func parseServe(statusJSON []byte, target string) (ServeState, error) {
+	var st struct {
+		TCP map[string]struct {
+			HTTPS      bool
+			TCPForward string
+		}
+		Web map[string]struct {
+			Handlers map[string]struct{ Proxy, Path, Text string }
+		}
+	}
+	if err := json.Unmarshal(statusJSON, &st); err != nil {
+		return ServeState{}, err
+	}
+	if tcp, ok := st.TCP["443"]; ok && tcp.TCPForward != "" {
+		return ServeState{Conflict: Conflict}, nil
+	}
+	for hostport, web := range st.Web {
+		if !strings.HasSuffix(hostport, ":443") {
+			continue
+		}
+		if h, ok := web.Handlers["/"]; ok {
+			if h.Proxy == target {
+				return ServeState{Owned: true}, nil
+			}
+			return ServeState{Conflict: Conflict}, nil
+		}
+	}
+	return ServeState{}, nil
+}
+
+// ServeOn puts the Armarium at target on "/" of https://<name>, leaving any
+// other paths as they are.
+func ServeOn(ctx context.Context, target string) error {
+	_, err := run(ctx, "serve", "--bg", "--https=443", "--set-path=/", target)
+	return err
+}
+
+// ServeOff removes "/" from https:443; call it only when Armarium owns it.
+func ServeOff(ctx context.Context) error {
+	_, err := run(ctx, "serve", "--https=443", "--set-path=/", "off")
+	return err
+}
+
+// ServeCommand is the command an owner runs by hand when ServeOn fails.
+func ServeCommand(target string) string {
+	return "tailscale serve --bg --https=443 --set-path=/ " + target
+}
