@@ -5,6 +5,7 @@ import (
 	"context"
 	"io/fs"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/netip"
 	"time"
@@ -108,8 +109,16 @@ func (s *Server) Handler() http.Handler {
 
 // Serve runs the HTTP server until ctx is cancelled.
 func (s *Server) Serve(ctx context.Context) error {
+	ln, err := net.Listen("tcp", s.Cfg.Listen)
+	if err != nil {
+		return err
+	}
+	return s.ServeListener(ctx, ln)
+}
+
+// ServeListener serves on ln until ctx is cancelled.
+func (s *Server) ServeListener(ctx context.Context, ln net.Listener) error {
 	srv := &http.Server{
-		Addr:              s.Cfg.Listen,
 		Handler:           s.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
@@ -117,7 +126,7 @@ func (s *Server) Serve(ctx context.Context) error {
 		MaxHeaderBytes:    16 << 10,
 	}
 	errc := make(chan error, 1)
-	go func() { errc <- srv.ListenAndServe() }()
+	go func() { errc <- srv.Serve(ln) }()
 	select {
 	case err := <-errc:
 		return err

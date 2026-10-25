@@ -9,18 +9,11 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"path/filepath"
-	"strconv"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/c0ze/armarium/internal/config"
-	"github.com/c0ze/armarium/internal/covers"
-	"github.com/c0ze/armarium/internal/formats"
-	"github.com/c0ze/armarium/internal/httpapi"
-	"github.com/c0ze/armarium/internal/scan"
-	"github.com/c0ze/armarium/internal/store"
+	"github.com/c0ze/armarium/internal/server"
 	"github.com/c0ze/armarium/web"
 )
 
@@ -44,13 +37,8 @@ commands:
   healthcheck               exit 0 if the local server answers /healthz (for Docker)
 `
 
-// app is everything a command needs, opened from the config.
-type app struct {
-	cfg     config.Config
-	store   *store.Store
-	scanner *scan.Scanner
-	log     *slog.Logger
-}
+// app is the opened server with the command-line commands on it.
+type app struct{ *server.App }
 
 func main() {
 	fs := flag.NewFlagSet("armarium", flag.ExitOnError)
@@ -80,13 +68,13 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	switch cmd {
 	case "serve":
-		err = a.serve(ctx)
+		err = a.Serve(ctx, server.ServeOptions{UI: web.FS()})
 	case "scan":
 		only := ""
 		if len(args) > 0 {
 			only = args[0]
 		}
-		err = a.scanner.Run(ctx, only)
+		err = a.Scanner.Run(ctx, only)
 	case "token":
 		err = a.token(ctx, args)
 	case "library":
@@ -100,7 +88,7 @@ func main() {
 		os.Exit(2)
 	}
 	stop()
-	a.store.Close() // os.Exit skips defers; close so the WAL is checkpointed
+	a.Close() // os.Exit skips defers; close so the WAL is checkpointed
 	exit(err)
 }
 
@@ -125,77 +113,10 @@ func open(cfgPath string, log *slog.Logger, sync bool) (*app, error) {
 	if len(cfg.Overrides) > 0 {
 		log.Warn("environment overrides armarium.toml", "keys", strings.Join(cfg.Overrides, ", "))
 	}
-	if err := os.MkdirAll(cfg.DataDir, 0o755); err != nil {
-		return nil, err
-	}
-	st, err := store.Open(filepath.Join(cfg.DataDir, "armarium.db"))
+	s, err := server.Open(cfg, log, sync)
 	if err != nil {
 		return nil, err
 	}
-	libs := make([]store.Library, len(cfg.Libraries))
-	for i, l := range cfg.Libraries {
-		libs[i] = store.Library{Name: l.Name, Root: l.Root, Kind: l.Kind}
-	}
-	if sync {
-		if err := st.SyncLibraries(context.Background(), libs); err != nil {
-			st.Close()
-			var unconfigured *store.UnconfiguredError
-			if errors.As(err, &unconfigured) {
-				name := strconv.Quote(unconfigured.Names[0])
-				return nil, fmt.Errorf("%w. Put it back in the config, rename it with `armarium library rename %s NEW`, or delete it and its reading progress with `armarium library rm %s`", err, name, name)
-			}
-			return nil, err
-		}
-	}
-	sc := &scan.Scanner{
-		Store: st, Libraries: cfg.Libraries, Workers: cfg.Scan.Workers, Log: log,
-		DirSleep: time.Duration(cfg.Scan.DirSleepMS) * time.Millisecond,
-		Limits:   formats.Limits{MaxEntryBytes: cfg.Limits.MaxEntryBytes, MaxEntries: cfg.Limits.MaxEntries},
-	}
-	return &app{cfg: cfg, store: st, scanner: sc, log: log}, nil
-}
-
-func (a *app) serve(ctx context.Context) error {
-	cv := &covers.Service{
-		Dir:       filepath.Join(a.cfg.DataDir, "covers"),
-		MaxPixels: a.cfg.Limits.MaxImagePixels,
-		MaxBytes:  a.cfg.Limits.MaxEntryBytes,
-	}
-	if cleared, err := a.store.ResetSessionsIfPasswordChanged(ctx, a.cfg.PasswordHash); err != nil {
-		return err
-	} else if cleared {
-		a.log.Info("owner sessions cleared: the password changed")
-	}
-	// Page numbers stored before the root-first order move to the new numbers
-	// before anything is served; a comic that cannot be opened now is retried at
-	// the next start or scan. A database error stops the start: serving would
-	// resume the comics not yet renumbered on the wrong image.
-	if err := a.scanner.RemapPageOrder(ctx); err != nil {
-		return fmt.Errorf("page order remap: %w", err)
-	}
-	srv := httpapi.New(a.cfg, a.store, a.scanner, cv, web.FS(), a.log)
-	if a.cfg.PasswordHash == "" {
-		a.log.Warn("no password_hash configured: the web UI cannot log in (tokens still work); run `armarium hash-password`")
-	}
-	if h := a.cfg.Scan.IntervalH; h > 0 {
-		go a.scheduledScans(ctx, time.Duration(h)*time.Hour)
-	}
-	a.log.Info("armarium listening", "version", version, "addr", a.cfg.Listen, "libraries", len(a.cfg.Libraries))
-	return srv.Serve(ctx)
-}
-
-// scheduledScans is off by default: scans cost NAS I/O, so they are opt-in.
-func (a *app) scheduledScans(ctx context.Context, every time.Duration) {
-	t := time.NewTicker(every)
-	defer t.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-t.C:
-			if err := a.scanner.Run(ctx, ""); err != nil && !errors.Is(err, scan.ErrRunning) {
-				a.log.Error("scheduled scan", "err", err)
-			}
-		}
-	}
+	s.Version = version
+	return &app{s}, nil
 }

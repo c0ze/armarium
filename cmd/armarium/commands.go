@@ -78,13 +78,13 @@ func (a *app) token(ctx context.Context, args []string) error {
 			return errors.New("token add <name>")
 		}
 		secret := auth.NewSecret()
-		if _, err := a.store.AddToken(ctx, args[1], auth.Digest(secret)); err != nil {
+		if _, err := a.Store.AddToken(ctx, args[1], auth.Digest(secret)); err != nil {
 			return err
 		}
 		fmt.Fprintf(os.Stderr, "token %q created; it is shown only once:\n", args[1])
 		fmt.Println(secret)
 	case "list":
-		ts, err := a.store.Tokens(ctx)
+		ts, err := a.Store.Tokens(ctx)
 		if err != nil {
 			return err
 		}
@@ -102,13 +102,13 @@ func (a *app) token(ctx context.Context, args []string) error {
 		if len(args) != 2 {
 			return errors.New("token rm <name>")
 		}
-		ts, err := a.store.Tokens(ctx)
+		ts, err := a.Store.Tokens(ctx)
 		if err != nil {
 			return err
 		}
 		for _, t := range ts {
 			if t.Name == args[1] {
-				return a.store.DeleteToken(ctx, t.ID)
+				return a.Store.DeleteToken(ctx, t.ID)
 			}
 		}
 		return fmt.Errorf("no token named %q", args[1])
@@ -124,18 +124,18 @@ func (a *app) library(ctx context.Context, args []string) error {
 	}
 	switch args[0] {
 	case "list":
-		libs, err := a.store.Libraries(ctx)
+		libs, err := a.Store.Libraries(ctx)
 		if err != nil {
 			return err
 		}
 		configured := map[string]bool{}
-		for _, l := range a.cfg.Libraries {
+		for _, l := range a.Cfg.Libraries {
 			configured[l.Name] = true
 		}
 		w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 		fmt.Fprintln(w, "NAME\tCONFIGURED\tITEMS")
 		for _, l := range libs {
-			_, n, err := a.store.Items(ctx, store.ItemFilter{LibraryID: l.ID, Limit: 1})
+			_, n, err := a.Store.Items(ctx, store.ItemFilter{LibraryID: l.ID, Limit: 1})
 			if err != nil {
 				return err
 			}
@@ -150,7 +150,7 @@ func (a *app) library(ctx context.Context, args []string) error {
 		if len(args) != 3 {
 			return errors.New("library rename <old> <new>")
 		}
-		if err := a.store.RenameLibrary(ctx, args[1], args[2]); err != nil {
+		if err := a.Store.RenameLibrary(ctx, args[1], args[2]); err != nil {
 			return fmt.Errorf("rename %q: %w", args[1], err)
 		}
 		fmt.Printf("renamed %q to %q\n", args[1], args[2])
@@ -158,7 +158,7 @@ func (a *app) library(ctx context.Context, args []string) error {
 		if len(args) != 2 {
 			return errors.New("library rm <name>")
 		}
-		n, err := a.store.RemoveLibrary(ctx, args[1])
+		n, err := a.Store.RemoveLibrary(ctx, args[1])
 		if err != nil {
 			return fmt.Errorf("remove %q: %w", args[1], err)
 		}
