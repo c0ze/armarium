@@ -70,7 +70,7 @@
     {#each libs as lib, i (lib.root)}
       <li>
         <input aria-label="Library name" bind:value={lib.name} maxlength="60" />
-        <span class="path" title={lib.root}>{lib.root}</span>
+        <span class="path" title={lib.root}><bdi dir="ltr">{lib.root}</bdi></span>
         {#if lib.calibre}
           <span class="caps tag">Calibre</span>
         {:else}

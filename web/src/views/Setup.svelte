@@ -1,7 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { api, ApiError, setupApi, type LibrarySettings, type SetupInfo } from '../lib/api';
-  import { passwordProblem, readCode, settingsFor, waitFor } from '../lib/setup';
+  import { passwordProblem, readCode, settingsFor, waitFor, waitForRestart } from '../lib/setup';
   import LibraryRows from './LibraryRows.svelte';
   import NetworkChoice from './NetworkChoice.svelte';
 
@@ -38,6 +38,7 @@
   let network = $state<'local' | 'home'>('local');
   let tailscale = $state(false);
   let startAtLogin = $state(true);
+  let scanning = $state(false);
 
   const steps = $derived(info?.managed ? ['Password', 'Libraries', 'Who can read', 'Finish'] : ['Password', 'Finish']);
   const last = $derived(step === steps.length - 1);
@@ -93,14 +94,19 @@
       // Storage blocked: nothing was kept.
     }
     phase = 'starting';
-    // The desktop app restarts the server on the new settings; wait for it,
-    // then start the first scan.
-    const up = await waitFor(async () => (await api.session()).admin, 20000);
-    if (!up) {
-      phase = 'failed';
-      return;
+    // The desktop app restarts the server on the new settings and scans any
+    // new library; wait for both before showing the wall.
+    if (settings) {
+      const healthy = async () => (await fetch('/healthz', { cache: 'no-store' })).ok;
+      if (!(await waitForRestart(healthy))) {
+        phase = 'failed';
+        return;
+      }
+      if (settings.libraries.length) {
+        scanning = true;
+        await waitFor(async () => !(await api.scanStatus()).running, 15000, 700);
+      }
     }
-    if (settings?.libraries.length) await api.scan().catch(() => undefined);
     location.assign('/');
   }
 </script>
@@ -128,7 +134,10 @@
   {:else if phase === 'loading'}
     <p class="muted">Opening setup…</p>
   {:else if phase === 'starting'}
-    <section class="panel"><h2>Starting your library…</h2><p class="muted">This takes a few seconds.</p></section>
+    <section class="panel" role="status">
+      <h2>{scanning ? 'Reading your library…' : 'Starting your library…'}</h2>
+      <p class="muted">{scanning ? 'Armarium is looking through your folders. A big library takes a while; you can start reading meanwhile.' : 'This takes a few seconds.'}</p>
+    </section>
   {:else if phase === 'failed'}
     <section class="panel">
       <h2>Armarium didn't come back</h2>

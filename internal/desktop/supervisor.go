@@ -53,6 +53,7 @@ type Supervisor struct {
 	state       State
 	previous    []byte // the config before the last Apply, put back if the new one won't start
 	carriedErr  string // shown with the next running state
+	scanNext    bool   // scan once the restarted server is up (a library was added or moved)
 	tsErr       string // why tailscale serve couldn't be set up
 }
 
@@ -125,10 +126,17 @@ func (s *Supervisor) runOnce(ctx context.Context) (started bool, err error) {
 		Ready: func(string) {
 			started = true
 			s.mu.Lock()
-			msg := s.carriedErr
-			s.carriedErr = ""
+			msg, scan := s.carriedErr, s.scanNext
+			s.carriedErr, s.scanNext = "", false
 			s.mu.Unlock()
 			s.setState(State{Running: true, URL: url, Err: msg})
+			if scan {
+				go func() {
+					if err := app.Scanner.Run(serveCtx, ""); err != nil && serveCtx.Err() == nil {
+						s.Log.Warn("scan after settings change", "err", err)
+					}
+				}()
+			}
 		},
 		OnSetup: func(link string) {
 			s.mu.Lock()
@@ -182,6 +190,22 @@ func port(c config.Config) int {
 		return c.Desktop.Port
 	}
 	return config.DefaultPort
+}
+
+// librariesGrew reports a library folder in next that old didn't have.
+func librariesGrew(old, next []config.Library) bool {
+	for _, n := range next {
+		found := false
+		for _, o := range old {
+			if o.Root == n.Root && o.Kind == n.Kind && o.Calibre == n.Calibre {
+				found = true
+			}
+		}
+		if !found {
+			return true
+		}
+	}
+	return false
 }
 
 func target(port int) string { return "http://127.0.0.1:" + strconv.Itoa(port) }
@@ -244,6 +268,7 @@ func (s *Supervisor) Apply(ctx context.Context, ch httpapi.Change) error {
 	}
 	s.mu.Lock()
 	s.previous = prev
+	s.scanNext = librariesGrew(old.Libraries, next.Libraries)
 	cancel := s.cancelServe
 	s.mu.Unlock()
 	if ch.StartAtLogin != nil && s.LoginItem != nil {

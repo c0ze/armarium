@@ -17,6 +17,7 @@ import (
 
 	"github.com/c0ze/armarium/internal/config"
 	"github.com/c0ze/armarium/internal/httpapi"
+	"github.com/c0ze/armarium/internal/scan"
 	tu "github.com/c0ze/armarium/internal/testutil"
 )
 
@@ -199,8 +200,16 @@ func (h *harness) apply(ch httpapi.Change) {
 func (h *harness) items() map[string]int {
 	h.t.Helper()
 	a := h.s.current()
-	if err := a.Scanner.Run(context.Background(), ""); err != nil {
-		h.t.Fatal(err)
+	// The supervisor may already be scanning a new library; wait and scan again.
+	for {
+		err := a.Scanner.Run(context.Background(), "")
+		if err == nil {
+			break
+		}
+		if !errors.Is(err, scan.ErrRunning) {
+			h.t.Fatal(err)
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 	counts, err := a.Store.LibraryItemCounts(context.Background())
 	if err != nil {
@@ -317,4 +326,21 @@ func TestFriendly(t *testing.T) {
 	if got := friendly(errors.New("config: bad")); got != "config: bad" {
 		t.Errorf("%q", got)
 	}
+}
+
+func TestApplyScansNewLibraryAfterRestart(t *testing.T) {
+	h := start(t)
+	comics := comicsFolder(t)
+	s := config.Settings{Network: "local", Port: h.s.DefaultPort, Libraries: []config.Library{{Name: "Comics", Root: comics, Kind: "comics"}}}
+	h.apply(httpapi.Change{Settings: s})
+	deadline := time.Now().Add(15 * time.Second)
+	for time.Now().Before(deadline) {
+		if a := h.s.current(); a != nil {
+			if counts, _ := a.Store.LibraryItemCounts(context.Background()); counts["Comics"] == 2 {
+				return
+			}
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	t.Fatal("the new library was not scanned after the restart")
 }

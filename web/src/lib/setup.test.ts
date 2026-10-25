@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultName, libraryChanges, passwordProblem, readCode, settingsFor, uniqueName, waitFor } from './setup';
+import { defaultName, libraryChanges, passwordProblem, readCode, settingsFor, uniqueName, waitFor, waitForRestart } from './setup';
 
 describe('readCode', () => {
   it('takes the code from the setup link fragment', () => {
@@ -85,5 +85,21 @@ describe('libraryChanges', () => {
   it('treats an untouched list as no change', () => {
     const before = [lib('Comics', '/c')];
     expect(libraryChanges(before, before, [])).toEqual({ renames: {}, removals: [] });
+  });
+});
+
+describe('waitForRestart', () => {
+  it('waits for the server to go away and come back', async () => {
+    const answers = [true, true, false, false, true];
+    let i = 0;
+    const up = async () => answers[Math.min(i++, answers.length - 1)];
+    expect(await waitForRestart(up, { downMs: 1000, upMs: 1000, everyMs: 1 })).toBe(true);
+    expect(i).toBe(5);
+  });
+  it('carries on when the restart was too quick to see', async () => {
+    expect(await waitForRestart(async () => true, { downMs: 10, upMs: 1000, everyMs: 1 })).toBe(true);
+  });
+  it('gives up when the server never comes back', async () => {
+    expect(await waitForRestart(async () => false, { downMs: 10, upMs: 20, everyMs: 1 })).toBe(false);
   });
 });

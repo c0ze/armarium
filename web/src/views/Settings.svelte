@@ -1,6 +1,6 @@
 <script lang="ts">
   import { api, ApiError, type LibrarySettings, type SettingsInfo } from '../lib/api';
-  import { libraryChanges, passwordProblem, settingsFor, waitFor } from '../lib/setup';
+  import { libraryChanges, passwordProblem, settingsFor, waitFor, waitForRestart } from '../lib/setup';
   import LibraryRows from './LibraryRows.svelte';
   import NetworkChoice from './NetworkChoice.svelte';
 
@@ -68,16 +68,17 @@
       const { reloadUrl } = await api.saveSettings({ settings, renames, removals });
       restarting = true;
       const target = new URL(reloadUrl);
-      // A new port is a new origin: wait until it answers, then go there.
-      await waitFor(async () => {
-        await fetch(`${target.origin}/healthz`, { mode: 'no-cors', cache: 'no-store' });
-        return true;
-      }, 15000);
-      await new Promise((r) => setTimeout(r, 400));
+      const healthy = async () => (await fetch('/healthz', { cache: 'no-store' })).ok;
       if (target.origin === location.origin) {
+        await waitForRestart(healthy);
         restarting = false;
         await load();
       } else {
+        // The page may only fetch its own origin (CSP connect-src 'self'), so
+        // a new port can't be polled: wait for this one to close, give the
+        // server a moment to start on the new one, then go there.
+        await waitFor(async () => !(await healthy().catch(() => false)), 5000, 100);
+        await new Promise((r) => setTimeout(r, 1500));
         location.assign(reloadUrl);
       }
     } catch (e) {

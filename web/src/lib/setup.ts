@@ -67,3 +67,13 @@ export function libraryChanges(
   }
   return { renames, removals: [...removed] };
 }
+
+/** After a save the desktop app restarts the server about 300 ms later: wait
+ * until it is gone (or a moment has passed), then until it answers again. */
+export async function waitForRestart(
+  up: () => Promise<boolean>,
+  { downMs = 3000, upMs = 20000, everyMs = 100 } = {},
+): Promise<boolean> {
+  await waitFor(async () => !(await up().catch(() => false)), downMs, everyMs);
+  return waitFor(up, upMs, everyMs);
+}
