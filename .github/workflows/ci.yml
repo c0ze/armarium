@@ -38,6 +38,48 @@ jobs:
       - name: Static binary
         run: CGO_ENABLED=0 go build -trimpath -o bin/armarium ./cmd/armarium && bin/armarium version
 
+  # The desktop app and the Windows installer, on the systems they run on.
+  desktop-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Desktop tests and the menu-bar app
+        run: |
+          go test ./internal/desktop/ ./internal/config/ ./internal/tailscale/
+          CGO_ENABLED=1 go build -o bin/armarium-desktop ./cmd/armarium-desktop
+          bin/armarium-desktop version
+
+  desktop-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Desktop tests
+        run: go test ./internal/desktop/ ./internal/config/ ./internal/tailscale/ ./internal/httpapi/
+      - name: Build Armarium.exe and the installer
+        run: |
+          go run github.com/tc-hib/go-winres@v0.3.3 make --in cmd/armarium-desktop/winres/winres.json \
+            --out cmd/armarium-desktop/rsrc --arch amd64
+          mkdir -p dist/windows
+          CGO_ENABLED=0 go build -ldflags "-H windowsgui" -o dist/windows/Armarium.exe ./cmd/armarium-desktop
+          CGO_ENABLED=0 go build -o dist/windows/armarium.exe ./cmd/armarium
+          iscc="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
+          [ -x "$iscc" ] || { choco install innosetup -y --no-progress; }
+          "$iscc" "/DMyAppVersion=0.0.0" "/DSourceDir=..\..\dist\windows" packaging/windows/armarium.iss
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-installer-ci
+          path: dist/Armarium-Setup-*.exe
+          retention-days: 14
+
   docker:
     runs-on: ubuntu-latest
     steps:
