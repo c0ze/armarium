@@ -1,6 +1,7 @@
 # Project website
 
-The public project site is **https://c0ze.github.io/armarium/**. Its source is in
+The public project site is **https://armarium.skriv.ist/** (GitHub Pages with a custom
+domain; https://c0ze.github.io/armarium/ redirects there). Its source is in
 `site/`, separate from the embedded application UI in `web/`.
 
 It is plain HTML, CSS, and a small JavaScript enhancement for installation tabs
@@ -26,8 +27,22 @@ disclosure. With JavaScript disabled, both installation methods remain visible.
 GitHub Pages uses **GitHub Actions** as its publishing source. The
 `.github/workflows/pages.yml` workflow uploads only `site/` and publishes it to
 the `github-pages` environment. It runs when changes to `site/` or that workflow
-reach `main`, and can also be started manually from Actions. No release or
-application build is required.
+reach `main`, when a release is published, and when started manually from
+Actions. No application build is required.
+
+The Download buttons in `site/index.html` point at the release page
+(`releases/latest`) and carry the asset name in `data-asset`, with `{v}` for the
+version. Before uploading, the workflow asks GitHub for the latest published
+release and rewrites each of those links to that release's file, and the
+`data-release-version` label to its tag. A local preview therefore shows the
+release page links and the version written in the source. If an asset is renamed
+in a release, update its `data-asset`; the workflow fails rather than publish
+fewer than five download links.
+
+The custom domain is set in the repository's Pages settings (no `CNAME` file is
+needed with Actions publishing). DNS: a `CNAME` record `armarium` →
+`c0ze.github.io` in the `skriv.ist` Cloudflare zone, DNS only (not proxied), so
+GitHub can issue the HTTPS certificate.
 
 Keep the site’s setup commands, formats, and pairing instructions aligned with
 `docs/deploy.md`, `docs/clients.md`, and `deploy/armarium.example.toml`. In
