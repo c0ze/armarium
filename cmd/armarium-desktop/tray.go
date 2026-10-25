@@ -21,6 +21,7 @@ type tray struct {
 	mu         sync.Mutex
 	status     *systray.MenuItem
 	openedOnce bool
+	exiting    bool // menu updates stop: they would wait on the main thread exit blocks
 }
 
 const (
@@ -104,7 +105,13 @@ func (t *tray) ready(ctx context.Context) {
 
 // exit runs when the app is quitting by any route (the menu, logout, a quit
 // Apple Event): stop the server so the database closes cleanly.
+//
+// It runs on the main thread, and systray applies menu changes there and
+// waits for them, so the menu must not change while it waits for the server.
 func (t *tray) exit() {
+	t.mu.Lock()
+	t.exiting = true
+	t.mu.Unlock()
 	t.cancel()
 	select {
 	case <-t.stopped:
@@ -171,7 +178,7 @@ func (t *tray) watchScans(ctx context.Context) {
 func (t *tray) setStatus(s string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if t.status != nil {
+	if t.status != nil && !t.exiting {
 		t.status.SetTitle(s)
 	}
 }
