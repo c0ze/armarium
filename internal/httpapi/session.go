@@ -16,13 +16,30 @@ import (
 
 const sessionTTL = 30 * 24 * time.Hour
 
+// passwordHash is the owner password in force: password_hash from the config
+// wins over the one set from the browser or `armarium password`.
+func (s *Server) passwordHash(ctx context.Context) (hash string, fromConfig bool, err error) {
+	if s.Cfg.PasswordHash != "" {
+		return s.Cfg.PasswordHash, true, nil
+	}
+	hash, err = s.Store.OwnerPassword(ctx)
+	return hash, false, err
+}
+
 func (s *Server) getSession(w http.ResponseWriter, r *http.Request) {
+	hash, fromConfig, err := s.passwordHash(r.Context())
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
 	p := principal(r)
 	writeJSON(w, http.StatusOK, map[string]any{
-		"authenticated": p != Anonymous,
-		"admin":         p == Session,
-		"passwordSet":   s.Cfg.PasswordHash != "",
-		"panelflowUrl":  s.Cfg.PanelFlowURL,
+		"authenticated":      p != Anonymous,
+		"admin":              p == Session,
+		"passwordSet":        hash != "",
+		"passwordFromConfig": fromConfig,
+		"setupOpen":          hash == "",
+		"panelflowUrl":       s.Cfg.PanelFlowURL,
 	})
 }
 
@@ -34,23 +51,41 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid body")
 		return
 	}
-	if s.Cfg.PasswordHash == "" {
-		writeError(w, http.StatusForbidden, "no password configured; run `armarium hash-password`")
-		return
-	}
-	if !s.logins.reserve(s.clientAddr(r)) {
-		writeError(w, http.StatusTooManyRequests, "too many attempts, wait a minute")
-		return
-	}
-	ok, err := s.logins.check(s.Cfg.PasswordHash, body.Password)
+	hash, _, err := s.passwordHash(r.Context())
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	if !ok {
-		writeError(w, http.StatusUnauthorized, "wrong password")
+	if hash == "" {
+		writeError(w, http.StatusForbidden, "no password set yet; finish setup, or run `armarium password`")
 		return
 	}
+	if !s.checkPassword(w, r, hash, body.Password) {
+		return
+	}
+	s.startSession(w, r)
+}
+
+// checkPassword counts the attempt against the login limits, then checks it.
+// It has answered the request when it returns false.
+func (s *Server) checkPassword(w http.ResponseWriter, r *http.Request, hash, password string) bool {
+	if !s.logins.reserve(s.clientAddr(r)) {
+		writeError(w, http.StatusTooManyRequests, "too many attempts, wait a minute")
+		return false
+	}
+	ok, err := s.logins.check(hash, password)
+	if err != nil {
+		s.fail(w, r, err)
+		return false
+	}
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "wrong password")
+	}
+	return ok
+}
+
+// startSession logs the owner in with a new session cookie.
+func (s *Server) startSession(w http.ResponseWriter, r *http.Request) {
 	secret := auth.NewSecret()
 	if err := s.Store.AddSession(r.Context(), auth.Digest(secret), sessionTTL); err != nil {
 		s.fail(w, r, err)
@@ -61,6 +96,47 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: s.Cfg.SecureCookie || s.isHTTPS(r),
 	})
 	writeJSON(w, http.StatusOK, map[string]bool{"authenticated": true, "admin": true})
+}
+
+const minPasswordLen = 8
+
+// changePassword replaces the stored owner password. Every session ends; this
+// one continues with a new cookie.
+func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Current string `json:"current"`
+		New     string `json:"new"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid body")
+		return
+	}
+	hash, fromConfig, err := s.passwordHash(r.Context())
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	if fromConfig {
+		writeError(w, http.StatusConflict, "password_hash is set in armarium.toml")
+		return
+	}
+	if len(body.New) < minPasswordLen {
+		writeError(w, http.StatusBadRequest, "use at least 8 characters")
+		return
+	}
+	if !s.checkPassword(w, r, hash, body.Current) {
+		return
+	}
+	newHash, err := auth.HashPassword(body.New)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	if err := s.Store.SetOwnerPassword(r.Context(), newHash); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	s.startSession(w, r)
 }
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {

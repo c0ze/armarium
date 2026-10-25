@@ -90,12 +90,15 @@ you already use.
 Armarium keeps only an argon2id hash of it, so it can't be recovered, only replaced:
 
 ```bash
-docker exec -i armarium /armarium hash-password      # type the new password, press Enter
+docker exec -it armarium /armarium password      # type the new password twice
 ```
 
-Paste the printed hash into `password_hash` in `armarium.toml` and restart the
-container (`docker compose restart`). Without Docker, run `armarium hash-password`
-instead. API tokens are unaffected.
+Without Docker, run `armarium password`. This stores the new password in the
+database and logs out every web UI session; API tokens are unaffected.
+
+If `password_hash` is set in `armarium.toml`, that one wins and `armarium
+password` refuses. Either remove it and use `armarium password`, or replace it
+with the output of `armarium hash-password` and restart.
 
 ## Binary and systemd
 
@@ -126,6 +129,7 @@ armarium token list | rm <name>
 armarium library list             libraries in the database, configured or not
 armarium library rename <old> <new>   keep a library's items under a new name
 armarium library rm <name>        delete a library with its items and progress
+armarium password                 set the owner password (stored in the database)
 armarium hash-password            argon2id hash of a password read from stdin
 armarium import-kavita --db kavita.db --library <name> --root <path Kavita saw>
 armarium import-skrivist --db reader_index.db --library <name>

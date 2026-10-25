@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/c0ze/armarium/internal/auth"
 	"github.com/c0ze/armarium/internal/config"
 	"github.com/c0ze/armarium/internal/covers"
 	"github.com/c0ze/armarium/internal/formats"
@@ -82,7 +83,11 @@ func (a *App) Serve(ctx context.Context, opts ServeOptions) error {
 		MaxPixels: a.Cfg.Limits.MaxImagePixels,
 		MaxBytes:  a.Cfg.Limits.MaxEntryBytes,
 	}
-	if cleared, err := a.Store.ResetSessionsIfPasswordChanged(ctx, a.Cfg.PasswordHash); err != nil {
+	hash, err := a.PasswordHash(ctx)
+	if err != nil {
+		return err
+	}
+	if cleared, err := a.Store.ResetSessionsIfPasswordChanged(ctx, hash); err != nil {
 		return err
 	} else if cleared {
 		a.Log.Info("owner sessions cleared: the password changed")
@@ -95,9 +100,6 @@ func (a *App) Serve(ctx context.Context, opts ServeOptions) error {
 		return fmt.Errorf("page order remap: %w", err)
 	}
 	srv := httpapi.New(a.Cfg, a.Store, a.Scanner, cv, opts.UI, a.Log)
-	if a.Cfg.PasswordHash == "" {
-		a.Log.Warn("no password_hash configured: the web UI cannot log in (tokens still work); run `armarium hash-password`")
-	}
 	ln, err := net.Listen("tcp", a.Cfg.Listen)
 	if err != nil {
 		return err
@@ -110,6 +112,32 @@ func (a *App) Serve(ctx context.Context, opts ServeOptions) error {
 		opts.Ready(ln.Addr().String())
 	}
 	return srv.ServeListener(ctx, ln)
+}
+
+// PasswordHash is the owner password in force: password_hash from the config,
+// else the one stored in the database. "" means none is set yet.
+func (a *App) PasswordHash(ctx context.Context) (string, error) {
+	if a.Cfg.PasswordHash != "" {
+		return a.Cfg.PasswordHash, nil
+	}
+	return a.Store.OwnerPassword(ctx)
+}
+
+// SetPassword stores a new owner password (at least 8 characters) and ends
+// every owner session. A password_hash in the config would hide it, so that
+// is refused.
+func (a *App) SetPassword(ctx context.Context, password string) error {
+	if a.Cfg.PasswordHash != "" {
+		return errors.New("password_hash in the config wins over a stored password; remove it from armarium.toml first")
+	}
+	if len(password) < 8 {
+		return errors.New("use at least 8 characters")
+	}
+	hash, err := auth.HashPassword(password)
+	if err != nil {
+		return err
+	}
+	return a.Store.SetOwnerPassword(ctx, hash)
 }
 
 // scheduledScans is off by default: scans cost NAS I/O, so they are opt-in.

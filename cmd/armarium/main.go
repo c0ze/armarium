@@ -30,6 +30,7 @@ commands:
   library list              libraries in the database, configured or not
   library rename <old> <new>   keep a library's items and progress under a new name
   library rm <name>         delete a library with its items and reading progress
+  password                  set the owner password (stored in the database)
   hash-password             read a password on stdin, print its argon2id hash
   import-skrivist --db reader_index.db --library <name>
   import-kavita   --db kavita.db --library <name> --root <kavita path prefix>
@@ -79,6 +80,8 @@ func main() {
 		err = a.token(ctx, args)
 	case "library":
 		err = a.library(ctx, args)
+	case "password":
+		err = a.password(ctx)
 	case "import-skrivist":
 		err = a.importSkrivist(ctx, args)
 	case "import-kavita":

@@ -47,15 +47,25 @@ func healthcheck() error {
 	return nil
 }
 
-func hashPassword() error {
-	fmt.Fprint(os.Stderr, "password: ")
+// readPassword prompts on stderr and reads one line from stdin, hidden when
+// stdin is a terminal.
+func readPassword(prompt string, in *bufio.Reader) (string, error) {
+	fmt.Fprint(os.Stderr, prompt)
 	restore := hideInput()
-	line, err := bufio.NewReader(os.Stdin).ReadString('\n')
+	line, err := in.ReadString('\n')
 	restore()
+	fmt.Fprintln(os.Stderr)
 	if err != nil && line == "" {
-		return errors.New("no password on stdin")
+		return "", errors.New("no password on stdin")
 	}
-	pw := strings.TrimRight(line, "\r\n")
+	return strings.TrimRight(line, "\r\n"), nil
+}
+
+func hashPassword() error {
+	pw, err := readPassword("password: ", bufio.NewReader(os.Stdin))
+	if err != nil {
+		return err
+	}
 	if len(pw) < 8 {
 		return errors.New("use at least 8 characters")
 	}
@@ -63,8 +73,29 @@ func hashPassword() error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(os.Stderr)
 	fmt.Println(h)
+	return nil
+}
+
+// password sets the owner password stored in the database, for a forgotten
+// password or a server set up without the browser.
+func (a *app) password(ctx context.Context) error {
+	in := bufio.NewReader(os.Stdin)
+	pw, err := readPassword("new password: ", in)
+	if err != nil {
+		return err
+	}
+	again, err := readPassword("again: ", in)
+	if err != nil {
+		return err
+	}
+	if pw != again {
+		return errors.New("the two passwords don't match")
+	}
+	if err := a.SetPassword(ctx, pw); err != nil {
+		return err
+	}
+	fmt.Fprintln(os.Stderr, "Password set. Everyone logged in to the web UI has to log in again.")
 	return nil
 }
 
