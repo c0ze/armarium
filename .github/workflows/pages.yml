@@ -37,13 +37,22 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           version=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
-          python3 - "$version" site/index.html <<'PY'
+          gh release view "$version" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' > assets.txt
+          python3 - "$version" site/index.html assets.txt <<'PY'
           import re, sys
-          tag, path = sys.argv[1], sys.argv[2]
+          tag, path, listing = sys.argv[1], sys.argv[2], sys.argv[3]
+          assets = set(open(listing, encoding="utf-8").read().split())
           base = f"https://github.com/c0ze/armarium/releases/download/{tag}/"
           s = open(path, encoding="utf-8").read()
-          s, links = re.subn(r'href="[^"]*" data-asset="([^"]+)"',
-                             lambda m: f'href="{base}{m.group(1).format(v=tag.lstrip("v"))}"', s)
+          missing = []
+          def link(m):
+              name = m.group(1).format(v=tag.lstrip("v"))
+              if name not in assets:
+                  missing.append(name)
+              return f'href="{base}{name}"'
+          s, links = re.subn(r'href="[^"]*" data-asset="([^"]+)"', link, s)
+          if missing:
+              sys.exit(f"{tag} has no {', '.join(missing)}: not publishing broken download links")
           s, labels = re.subn(r'(<span data-release-version>)[^<]*', rf'\g<1>{tag}', s)
           if links < 5 or labels < 1:
               sys.exit(f"expected 5 download links and a version label, found {links} and {labels}")
