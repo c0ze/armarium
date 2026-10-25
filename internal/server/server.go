@@ -38,6 +38,9 @@ type ServeOptions struct {
 	Host httpapi.Host // the desktop app; nil from the command line
 	// Ready is called once the server listens, with its address.
 	Ready func(addr string)
+	// OnSetup is called with the first-run setup link while no owner
+	// password exists; the desktop app opens it in the browser.
+	OnSetup func(url string)
 }
 
 // Open opens the data folder and database for cfg. syncLibraries makes every
@@ -102,6 +105,9 @@ func (a *App) Serve(ctx context.Context, opts ServeOptions) error {
 	}
 	srv := httpapi.New(a.Cfg, a.Store, a.Scanner, cv, opts.UI, a.Log)
 	srv.Host = opts.Host
+	if hash == "" {
+		srv.SetupCode = httpapi.NewSetupCode()
+	}
 	ln, err := net.Listen("tcp", a.Cfg.Listen)
 	if err != nil {
 		return err
@@ -113,7 +119,30 @@ func (a *App) Serve(ctx context.Context, opts ServeOptions) error {
 	if opts.Ready != nil {
 		opts.Ready(ln.Addr().String())
 	}
+	if srv.SetupCode != "" {
+		url := baseURL(ln.Addr().String()) + "/setup#code=" + srv.SetupCode
+		a.Log.Info("Finish setup: " + url)
+		if host, _, _ := net.SplitHostPort(ln.Addr().String()); !net.ParseIP(host).IsLoopback() {
+			a.Log.Info("From another computer, use this server's address instead of 127.0.0.1 in the setup link")
+		}
+		if opts.OnSetup != nil {
+			opts.OnSetup(url)
+		}
+	}
 	return srv.ServeListener(ctx, ln)
+}
+
+// baseURL is where a browser on this machine reaches a server listening on
+// addr: 127.0.0.1 for loopback and every-interface addresses.
+func baseURL(addr string) string {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return "http://" + addr
+	}
+	if ip := net.ParseIP(host); host == "" || ip == nil || ip.IsUnspecified() || ip.IsLoopback() {
+		host = "127.0.0.1"
+	}
+	return "http://" + net.JoinHostPort(host, port)
 }
 
 // PasswordHash is the owner password in force: password_hash from the config,

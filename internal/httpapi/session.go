@@ -100,6 +100,8 @@ func (s *Server) startSession(w http.ResponseWriter, r *http.Request) {
 
 const minPasswordLen = 8
 
+var hashPassword = auth.HashPassword
+
 // changePassword replaces the stored owner password. Every session ends; this
 // one continues with a new cookie.
 func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
@@ -127,7 +129,7 @@ func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 	if !s.checkPassword(w, r, hash, body.Current) {
 		return
 	}
-	newHash, err := auth.HashPassword(body.New)
+	newHash, err := hashPassword(body.New)
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -197,6 +199,18 @@ func (l *loginLimiter) reserve(client netip.Addr) bool {
 	l.attempts[client] = append(l.attempts[client], now)
 	l.all = append(l.all, now)
 	return true
+}
+
+// forgive takes back client's latest attempt: a right setup code is not a guess.
+func (l *loginLimiter) forgive(client netip.Addr) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if t := l.attempts[client]; len(t) > 0 {
+		l.attempts[client] = t[:len(t)-1]
+	}
+	if len(l.all) > 0 {
+		l.all = l.all[:len(l.all)-1]
+	}
 }
 
 func (l *loginLimiter) check(hash, password string) (bool, error) {

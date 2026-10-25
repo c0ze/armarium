@@ -77,3 +77,57 @@ func TestSetPassword(t *testing.T) {
 		t.Fatalf("with a config hash: %v", err)
 	}
 }
+
+func TestServeOpensSetupWithoutPassword(t *testing.T) {
+	cfg := config.Default()
+	cfg.DataDir = t.TempDir()
+	cfg.Listen = "127.0.0.1:0"
+	var logs strings.Builder
+	a, err := Open(cfg, slog.New(slog.NewTextHandler(&logs, nil)), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	setup := make(chan string, 1)
+	go a.Serve(ctx, ServeOptions{OnSetup: func(url string) { setup <- url }})
+	var url string
+	select {
+	case url = <-setup:
+	case <-time.After(10 * time.Second):
+		t.Fatal("no setup link")
+	}
+	if !strings.HasPrefix(url, "http://127.0.0.1:") || !strings.Contains(url, "/setup#code=") {
+		t.Fatalf("setup url %q", url)
+	}
+	code := url[strings.Index(url, "#code=")+6:]
+	if len(code) < 40 {
+		t.Fatalf("code %q is too short", code)
+	}
+	res, err := http.Get(strings.Replace(url, "/setup#code="+code, "/api/setup", 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != 401 {
+		t.Fatalf("setup API without the code: %d", res.StatusCode)
+	}
+	if !strings.Contains(logs.String(), "Finish setup") {
+		t.Fatalf("log has no setup line:\n%s", logs.String())
+	}
+}
+
+func TestSetupURL(t *testing.T) {
+	for listen, want := range map[string]string{
+		"127.0.0.1:8580":    "http://127.0.0.1:8580",
+		"0.0.0.0:8580":      "http://127.0.0.1:8580",
+		":8580":             "http://127.0.0.1:8580",
+		"[::]:8580":         "http://127.0.0.1:8580",
+		"192.168.1.20:8580": "http://192.168.1.20:8580",
+	} {
+		if got := baseURL(listen); got != want {
+			t.Errorf("baseURL(%q) = %q, want %q", listen, got, want)
+		}
+	}
+}

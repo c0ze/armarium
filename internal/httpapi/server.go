@@ -25,6 +25,8 @@ type Server struct {
 	UI      fs.FS // built web app; may be nil
 	Log     *slog.Logger
 	Host    Host // the desktop app; nil when started from the command line
+	// SetupCode opens first-run setup while no owner password exists.
+	SetupCode string
 
 	limits  formats.Limits
 	comics  *formats.Cache[formats.Container]
@@ -94,6 +96,10 @@ func (s *Server) Handler() http.Handler {
 	route("DELETE /api/tokens/{id}", Admin, s.deleteToken)
 	route("GET /api/pair", Admin, s.getPair)
 	route("PUT /api/password", Admin, s.changePassword)
+	route("GET /api/setup", Public, s.setupGate(s.getSetup))
+	route("POST /api/setup/finish", Public, s.setupGate(s.finishSetup))
+	route("POST /api/setup/check-folder", Public, s.setupGate(s.checkFolder))
+	route("POST /api/setup/folder", Public, s.setupGate(s.chooseFolder))
 	route("GET /api/settings", Admin, s.getSettings)
 	route("PUT /api/settings", Admin, s.putSettings)
 	route("POST /api/settings/check-folder", Admin, s.checkFolder)
