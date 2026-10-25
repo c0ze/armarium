@@ -71,6 +71,17 @@ func (c *Cache[T]) Forget(key int64) {
 	}
 }
 
+// Clear drops every entry, closing each once no reader holds it: a server
+// that stops must not keep library files open (Windows won't let the owner
+// move or delete an open file).
+func (c *Cache[T]) Clear() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for c.order.Len() > 0 {
+		c.evict(c.order.Back())
+	}
+}
+
 func (c *Cache[T]) evict(el *list.Element) {
 	e := el.Value.(*cacheEntry[T])
 	c.order.Remove(el)

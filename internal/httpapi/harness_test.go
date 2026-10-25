@@ -95,6 +95,7 @@ func newEnvWith(t *testing.T, edit func(*config.Config)) *env {
 	}
 	cv := &covers.Service{Dir: filepath.Join(cfg.DataDir, "covers"), MaxPixels: 1 << 24, MaxBytes: 1 << 20}
 	srv := New(cfg, st, sc, cv, nil, log)
+	t.Cleanup(srv.Close) // before the temp dirs go: Windows can't delete open files
 	e := &env{t: t, srv: srv, h: srv.Handler(), items: map[string]store.Item{}}
 
 	e.token = auth.NewSecret()

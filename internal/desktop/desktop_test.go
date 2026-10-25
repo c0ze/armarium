@@ -34,9 +34,9 @@ func TestPathsFor(t *testing.T) {
 		t.Errorf("windows: %+v", w)
 	}
 	m, _ := pathsFor("darwin", getenv, "/Users/ana")
-	if m.Config != "/Users/ana/Library/Application Support/Armarium/armarium.toml" ||
-		m.Data != "/Users/ana/Library/Application Support/Armarium/data" ||
-		m.Logs != "/Users/ana/Library/Logs/Armarium" {
+	support := filepath.Join("/Users/ana", "Library", "Application Support", "Armarium")
+	if m.Config != filepath.Join(support, "armarium.toml") || m.Data != filepath.Join(support, "data") ||
+		m.Logs != filepath.Join("/Users/ana", "Library", "Logs", "Armarium") {
 		t.Errorf("darwin: %+v", m)
 	}
 	if _, err := pathsFor("windows", func(string) string { return "" }, `C:\Users\ana`); err == nil {

@@ -58,6 +58,12 @@ func New(cfg config.Config, st *store.Store, sc *scan.Scanner, cv *covers.Servic
 	return s
 }
 
+// Close closes the archives the server keeps open.
+func (s *Server) Close() {
+	s.comics.Clear()
+	s.books.Clear()
+}
+
 // Forget drops cached open archives for an item whose file changed.
 func (s *Server) Forget(itemID int64) {
 	s.comics.Forget(itemID)

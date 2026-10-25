@@ -104,6 +104,7 @@ func (a *App) Serve(ctx context.Context, opts ServeOptions) error {
 		return fmt.Errorf("page order remap: %w", err)
 	}
 	srv := httpapi.New(a.Cfg, a.Store, a.Scanner, cv, opts.UI, a.Log)
+	defer srv.Close()
 	srv.Host = opts.Host
 	if hash == "" {
 		srv.SetupCode = httpapi.NewSetupCode()

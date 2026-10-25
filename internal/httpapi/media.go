@@ -15,6 +15,7 @@ import (
 
 	"github.com/c0ze/armarium/internal/covers"
 	"github.com/c0ze/armarium/internal/formats"
+	"github.com/c0ze/armarium/internal/fsutil"
 	"github.com/c0ze/armarium/internal/store"
 )
 
@@ -44,7 +45,7 @@ func (s *Server) inLibrary(ctx context.Context, libraryID int64, p string) (stri
 		return "", errNotFound
 	}
 	rel, err := filepath.Rel(root, real)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, "../") || filepath.IsAbs(rel) {
+	if err != nil || !fsutil.Inside(rel) {
 		return "", errNotFound
 	}
 	return real, nil
