@@ -37,6 +37,7 @@ func (t *tray) ready(ctx context.Context) {
 		systray.SetIcon(trayWin)
 	}
 	systray.SetTooltip("Armarium")
+	listenForReopen(func() { t.browse("/") })
 
 	open := systray.AddMenuItem("Open Armarium", "Open your library in the browser")
 	pair := systray.AddMenuItem("Pair a phone…", "Show the QR code for the Skrivist apps")
@@ -99,6 +100,16 @@ func (t *tray) ready(ctx context.Context) {
 			}
 		}
 	}()
+}
+
+// exit runs when the app is quitting by any route (the menu, logout, a quit
+// Apple Event): stop the server so the database closes cleanly.
+func (t *tray) exit() {
+	t.cancel()
+	select {
+	case <-t.stopped:
+	case <-time.After(15 * time.Second):
+	}
 }
 
 // browse opens a page of the running Armarium, or setup while it isn't set up.

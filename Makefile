@@ -3,7 +3,7 @@ GO      ?= go
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
-.PHONY: all build desktop web test check docker clean
+.PHONY: all build desktop mac-app web test check docker clean
 
 all: web build
 
@@ -13,6 +13,11 @@ build:
 # The desktop app (tray / menu bar) for this machine; needs cgo on macOS.
 desktop:
 	$(GO) build -trimpath -ldflags '$(LDFLAGS)' -o bin/armarium-desktop ./cmd/armarium-desktop
+
+# An unsigned universal Armarium.app in bin/, for trying the Mac app locally.
+mac-app: web
+	rm -rf bin/Armarium.app
+	scripts/build-mac-app.sh $(VERSION) bin
 
 web:
 	cd web && npm ci --no-audit --no-fund && npm run build

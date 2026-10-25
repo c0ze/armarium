@@ -59,7 +59,7 @@ func main() {
 		Paths: paths, Log: log, UI: web.FS(), Version: version,
 		OnState: t.onState, LoginItem: newLoginItem(),
 	}
-	systray.Run(func() { t.ready(ctx) }, func() {})
+	systray.Run(func() { t.ready(ctx) }, t.exit)
 }
 
 // localURL is where this computer's browser reaches the configured port.
