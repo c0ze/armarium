@@ -25,7 +25,15 @@ test suite (valid Atom, link order, PSE attributes, token prefixes).
 
 ## Pairing a phone
 
-Admin → **Pair a phone** shows a QR code that opens Skrivist Comics
+**Skrivist Books app (iPhone, iPad, Android).** Admin → **Pair a phone** →
+**Skrivist Books app** shows a QR code holding an
+`skrivist-books://pair#opds=<catalogue>` link. Scan it from inside the app (Add
+library → Scan QR code), not with the camera app. The native app reaches plain
+HTTP on the home network, so this works without HTTPS or `cors_origins`: set
+`public_url` to the address phones use (the desktop apps do this by themselves
+in "Devices at home" mode).
+
+**Web readers.** The other targets show a QR code that opens Skrivist Comics
 (comics.skriv.ist) or Skrivist Books (books.skriv.ist) on a phone with this
 library's OPDS catalogue filled in; tap Connect and it's done. Pick the device
 (iPhone, Android, iPad or your own name) first: each pairing creates its own token,
