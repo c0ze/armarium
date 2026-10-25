@@ -12,21 +12,21 @@ import (
 )
 
 type Library struct {
-	Name string `toml:"name"`
-	Root string `toml:"root"`
-	Kind string `toml:"kind"` // "comics" or "books"
+	Name string `toml:"name" json:"name"`
+	Root string `toml:"root" json:"root"`
+	Kind string `toml:"kind" json:"kind"` // "comics" or "books"
 	// Include limits the scan to top-level entries matching these globs, e.g.
 	// ["*_downloads"] to serve only matching folders. Empty means everything.
-	Include []string `toml:"include"`
+	Include []string `toml:"include,omitempty" json:"include,omitempty"`
 	// Labels is an optional JSON file naming the sources (top-level folders):
 	// {"<folder>": "Label"} or {"<folder>": {"label": "..", "year": 2015}}.
-	Labels string `toml:"labels"`
+	Labels string `toml:"labels,omitempty" json:"labels,omitempty"`
 	// Tags is an optional JSON sidecar of subject tags by library-relative path:
 	// {"oreilly_downloads/Learning Go.epub": ["Go"]}.
-	Tags string `toml:"tags"`
+	Tags string `toml:"tags,omitempty" json:"tags,omitempty"`
 	// Calibre reads the library from root/metadata.db (titles, authors, series,
 	// tags, covers) instead of walking folders, like Calibre-Web.
-	Calibre bool `toml:"calibre"`
+	Calibre bool `toml:"calibre,omitempty" json:"calibre"`
 }
 
 type Scan struct {
@@ -66,6 +66,12 @@ type Config struct {
 	// The Docker image sets ARMARIUM_LISTEN and ARMARIUM_DATA_DIR, so a listen
 	// in armarium.toml would otherwise be ignored without a word.
 	Overrides []string `toml:"-"`
+	// Desktop marks a config Armarium manages (written by the desktop app);
+	// its network settings are derived from this table at load.
+	Desktop *Desktop `toml:"desktop"`
+	// AllowLocalAddresses also admits a Host that is one of this machine's own
+	// IP addresses (managed configs for devices at home).
+	AllowLocalAddresses bool `toml:"-"`
 }
 
 func Default() Config {
@@ -96,6 +102,11 @@ func Load(path string) (Config, error) {
 		}
 	}
 	applyEnv(&c, md)
+	if c.Desktop != nil {
+		if err := c.deriveDesktop(md); err != nil {
+			return c, err
+		}
+	}
 	return c, c.validate()
 }
 
