@@ -34,7 +34,8 @@ type App struct {
 
 // ServeOptions are what the caller adds to a running server.
 type ServeOptions struct {
-	UI fs.FS // built web app; nil serves no UI
+	UI   fs.FS        // built web app; nil serves no UI
+	Host httpapi.Host // the desktop app; nil from the command line
 	// Ready is called once the server listens, with its address.
 	Ready func(addr string)
 }
@@ -100,6 +101,7 @@ func (a *App) Serve(ctx context.Context, opts ServeOptions) error {
 		return fmt.Errorf("page order remap: %w", err)
 	}
 	srv := httpapi.New(a.Cfg, a.Store, a.Scanner, cv, opts.UI, a.Log)
+	srv.Host = opts.Host
 	ln, err := net.Listen("tcp", a.Cfg.Listen)
 	if err != nil {
 		return err

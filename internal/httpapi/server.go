@@ -24,6 +24,7 @@ type Server struct {
 	Covers  *covers.Service
 	UI      fs.FS // built web app; may be nil
 	Log     *slog.Logger
+	Host    Host // the desktop app; nil when started from the command line
 
 	limits  formats.Limits
 	comics  *formats.Cache[formats.Container]
@@ -32,6 +33,8 @@ type Server struct {
 	wait    time.Duration // how long a request waits for a slot before 503
 	logins  *loginLimiter
 	proxies []netip.Prefix // trusted_proxies
+	// scanning reports a running scan; tests replace it.
+	scanning func() bool
 }
 
 func New(cfg config.Config, st *store.Store, sc *scan.Scanner, cv *covers.Service, ui fs.FS, log *slog.Logger) *Server {
@@ -45,8 +48,10 @@ func New(cfg config.Config, st *store.Store, sc *scan.Scanner, cv *covers.Servic
 		wait:    10 * time.Second,
 		proxies: cfg.ProxyPrefixes(),
 	}
+	s.scanning = func() bool { return false }
 	if sc != nil {
 		sc.OnChange = s.Forget
+		s.scanning = func() bool { return sc.Status().Running }
 	}
 	return s
 }
@@ -89,6 +94,10 @@ func (s *Server) Handler() http.Handler {
 	route("DELETE /api/tokens/{id}", Admin, s.deleteToken)
 	route("GET /api/pair", Admin, s.getPair)
 	route("PUT /api/password", Admin, s.changePassword)
+	route("GET /api/settings", Admin, s.getSettings)
+	route("PUT /api/settings", Admin, s.putSettings)
+	route("POST /api/settings/check-folder", Admin, s.checkFolder)
+	route("POST /api/settings/folder", Admin, s.chooseFolder)
 
 	m.HandleFunc("GET /read/base.css", serveBaseCSS)
 	route("GET /read/{id}/chapter/{n}", Reader, s.getChapter)
