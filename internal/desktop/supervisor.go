@@ -214,6 +214,7 @@ func target(port int) string { return "http://127.0.0.1:" + strconv.Itoa(port) }
 func (s *Supervisor) Apply(ctx context.Context, ch httpapi.Change) error {
 	app := s.current()
 	if app == nil {
+		//lint:ignore ST1005 Apply's errors are shown to the owner as sentences
 		return errors.New("Armarium is restarting; try again in a moment")
 	}
 	old := app.Cfg
@@ -230,6 +231,7 @@ func (s *Supervisor) Apply(ctx context.Context, ch httpapi.Change) error {
 	if newPort != oldPort {
 		ln, err := net.Listen("tcp", next.Listen)
 		if err != nil {
+			//lint:ignore ST1005 shown to the owner as a sentence
 			return fmt.Errorf("Port %d is in use by another program. Choose another port.", newPort)
 		}
 		ln.Close()
