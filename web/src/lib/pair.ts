@@ -14,9 +14,10 @@ export function pairLink(readerUrl: string, base: string, secret: string): strin
   return `${reader}#opds=${encodeURIComponent(catalogue)}`;
 }
 
-/** Phones open the hosted readers, which only load HTTPS catalogues; the desktop
- * apps can use plain HTTP on the local network. */
-export const canPair = (reader: { desktop?: boolean }, plainHttp: boolean) => !!reader.desktop || !plainHttp;
+/** The hosted readers only load HTTPS catalogues; the desktop apps and the Books
+ * phone app can use plain HTTP on the local network. */
+export const canPair = (reader: { desktop?: boolean; native?: boolean }, plainHttp: boolean) =>
+  !!reader.desktop || !!reader.native || !plainHttp;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 

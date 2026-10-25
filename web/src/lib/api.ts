@@ -88,6 +88,8 @@ export interface PairReader {
   corsAllowed: boolean;
   /** A Skrivist desktop app (skrivist-<app>://pair) rather than a hosted reader. */
   desktop?: boolean;
+  /** The Skrivist Books phone app, which scans the QR from Add library → Scan QR code. */
+  native?: boolean;
   /** The exact cors_origins entries still to add. */
   missing: string[];
 }

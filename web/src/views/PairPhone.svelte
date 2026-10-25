@@ -87,12 +87,15 @@
 <section>
   <div class="bar"><h2>Pair a phone</h2></div>
   <p class="note muted">
-    Opens Skrivist Comics or Skrivist Books on your phone with this library's OPDS catalogue filled in. Each pairing gets its own token.
+    Connects a Skrivist reader on your phone to this library. Each pairing gets its own token.
   </p>
   {#if error}<p class="error">{error}</p>{/if}
   {#if info}
     {#if plainHttp}
-      <p class="warn block">Phones need HTTPS: the hosted readers only load HTTPS catalogues. Set <code>public_url</code> to an HTTPS address. The desktop apps below can use this address.</p>
+      <p class="warn">This address is plain HTTP. The Skrivist Books app can use it from phones on the same Wi-Fi. The web readers need an HTTPS address in <code>public_url</code>.</p>
+      {#if isLoopback(base)}
+        <p class="warn"><code>{base}</code> is this computer's loopback address; a phone can't reach it. In Settings, choose "Devices at home".</p>
+      {/if}
     {:else}
       {#if !info.publicUrl}
         <p class="warn">public_url is not set, so the QR uses this page's address (<code>{base}</code>). A phone may not reach it.</p>
@@ -104,12 +107,12 @@
     <div class="device">
       <label>
         <span class="caps">Device</span>
-        <select bind:value={device} disabled={plainHttp || busy}>
+        <select bind:value={device} disabled={busy}>
           {#each DEVICES as d (d)}<option value={d}>{d}</option>{/each}
         </select>
       </label>
       {#if device === 'Other'}
-        <input bind:value={other} maxlength="40" placeholder="Name it, e.g. Pixel 8" aria-label="Device name" disabled={plainHttp || busy} />
+        <input bind:value={other} maxlength="40" placeholder="Name it, e.g. Pixel 8" aria-label="Device name" disabled={busy} />
       {/if}
     </div>
     <div class="readers">
@@ -118,7 +121,7 @@
       {/each}
     </div>
     {#if !plainHttp}
-      {#each phones.filter((r) => !r.corsAllowed) as r (r.id)}
+      {#each phones.filter((r) => !r.corsAllowed && !r.native) as r (r.id)}
         <p class="warn">Add <code>{r.missing.join(', ')}</code> to <code>cors_origins</code>, or {r.name} can't load the catalogue.</p>
       {/each}
     {/if}
@@ -157,6 +160,8 @@
         {#if pairing.reader.desktop}
           <p><a href={pairing.link}>Open in {pairing.reader.name}</a>, then press Connect in the app. Or paste the link into its catalogue field.</p>
           <button onclick={() => copy(pairing!.link)}>{copied ? 'Copied' : 'Copy link'}</button>
+        {:else if pairing.reader.native}
+          <p>Open Skrivist Books on {pairing.device}, tap Add library, then Scan QR code, and scan this.</p>
         {:else}
           <p>Open the camera on {pairing.device}, scan this, then tap Connect in {pairing.reader.name}.</p>
         {/if}
@@ -178,7 +183,6 @@
   .device input { min-width: 14rem; }
   .readers { display: flex; flex-wrap: wrap; gap: 0.7rem; margin-bottom: 1rem; }
   .warn { margin: 0 0 0.8rem; font-size: 14px; color: var(--amber); }
-  .warn.block { color: var(--danger); }
   .pairing { display: flex; flex-wrap: wrap; gap: 1.4rem; align-items: flex-start; padding: 1rem 1.1rem; background: var(--surface); border: 1px solid var(--amber); border-radius: 3px; }
   .pairing svg { flex: none; width: 264px; height: 264px; max-width: 100%; }
   .details { flex: 1; min-width: 16rem; display: grid; gap: 0.6rem; justify-items: start; }
