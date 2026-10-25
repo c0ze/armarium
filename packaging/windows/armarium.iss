@@ -1,6 +1,6 @@
 ; Armarium for Windows: a per-user install (no administrator rights) of the
 ; tray app and the command line. Build with
-;   iscc /DMyAppVersion=X.Y.Z /DSourceDir=<folder with Armarium.exe, armarium.exe> packaging\windows\armarium.iss
+;   iscc /DMyAppVersion=X.Y.Z /DSourceDir=<folder with Armarium.exe and cli\armarium.exe> packaging\windows\armarium.iss
 ; The AppId must never change: a newer installer finds the old install by it.
 
 #ifndef MyAppVersion
@@ -41,7 +41,7 @@ WizardStyle=modern
 
 [Files]
 Source: "{#SourceDir}\Armarium.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#SourceDir}\armarium.exe"; DestDir: "{app}\cli"; Flags: ignoreversion
+Source: "{#SourceDir}\cli\armarium.exe"; DestDir: "{app}\cli"; Flags: ignoreversion
 Source: "..\..\LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreversion
 Source: "..\..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 

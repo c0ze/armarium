@@ -68,9 +68,12 @@ jobs:
         run: |
           go run github.com/tc-hib/go-winres@v0.3.3 make --in cmd/armarium-desktop/winres/winres.json \
             --out cmd/armarium-desktop/rsrc --arch amd64
-          mkdir -p dist/windows
+          mkdir -p dist/windows/cli
           CGO_ENABLED=0 go build -ldflags "-H windowsgui" -o dist/windows/Armarium.exe ./cmd/armarium-desktop
-          CGO_ENABLED=0 go build -o dist/windows/armarium.exe ./cmd/armarium
+          # Windows file names ignore case: the CLI lives in cli\ so it can't overwrite Armarium.exe.
+          CGO_ENABLED=0 go build -o dist/windows/cli/armarium.exe ./cmd/armarium
+          dist/windows/cli/armarium.exe version | grep -q '^armarium ' || { echo "cli/armarium.exe is not the CLI"; exit 1; }
+          if cmp -s dist/windows/Armarium.exe dist/windows/cli/armarium.exe; then echo "Armarium.exe is the CLI"; exit 1; fi
           iscc="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
           [ -x "$iscc" ] || { choco install innosetup -y --no-progress; }
           # Git Bash would rewrite ISCC's /D options as paths.

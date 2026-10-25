@@ -69,12 +69,15 @@ jobs:
           v=${VERSION#v}; num=${v%%-*}
           go run github.com/tc-hib/go-winres@v0.3.3 make --in cmd/armarium-desktop/winres/winres.json \
             --out cmd/armarium-desktop/rsrc --arch amd64 --product-version "$num" --file-version "$num"
-          mkdir -p dist/windows
+          mkdir -p dist/windows/cli
           CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath \
             -ldflags "-s -w -H windowsgui -X main.version=$VERSION" -o dist/windows/Armarium.exe ./cmd/armarium-desktop
           CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath \
-            -ldflags "-s -w -X main.version=$VERSION" -o dist/windows/armarium.exe ./cmd/armarium
-          dist/windows/armarium.exe version
+            -ldflags "-s -w -X main.version=$VERSION" -o dist/windows/cli/armarium.exe ./cmd/armarium
+          # Windows file names ignore case: the CLI lives in cli\ so it can't
+          # overwrite Armarium.exe.
+          dist/windows/cli/armarium.exe version
+          if cmp -s dist/windows/Armarium.exe dist/windows/cli/armarium.exe; then echo "Armarium.exe is the CLI"; exit 1; fi
 
       - name: Log in to Azure (signing)
         if: vars.WINDOWS_SIGNING == 'azure'
@@ -92,6 +95,7 @@ jobs:
           certificate-profile-name: ${{ vars.AZURE_SIGNING_PROFILE }}
           files-folder: dist/windows
           files-folder-filter: exe
+          files-folder-recurse: true
 
       - name: Build the installer
         run: |
