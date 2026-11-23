@@ -23,6 +23,7 @@ func (s *Server) opdsRoutes(prefix string, route func(string, Access, http.Handl
 	route("GET "+prefix, Reader, s.opdsCatalog)
 	route("GET "+prefix+"/catalog", Reader, s.opdsCatalog)
 	route("GET "+prefix+"/libraries/{id}", Reader, s.opdsLibrary)
+	route("GET "+prefix+"/libraries/{id}/titles", Reader, s.opdsTitles)
 	route("GET "+prefix+"/series/{id}", Reader, s.opdsSeries)
 	route("GET "+prefix+"/recent", Reader, s.opdsItemFeed("recent", "Recently added", store.ItemFilter{Sort: "added"}))
 	route("GET "+prefix+"/reading", Reader, s.opdsItemFeed("reading", "Continue reading", store.ItemFilter{Status: "reading", Sort: "recent"}))
@@ -105,8 +106,11 @@ func (s *Server) opdsLibrary(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	// "All titles" is entry 0 of the paged list, so offsets and the OpenSearch
+	// counters cover it: series n sits at offset n+1.
 	base, off := opdsBase(r), queryInt(r, "offset", 0, 0, 1<<30)
-	list, total, err := s.Store.SeriesList(r.Context(), id, "", off, opdsPerPage)
+	first := min(off, 1)
+	list, total, err := s.Store.SeriesList(r.Context(), id, "", max(off-1, 0), opdsPerPage-1+first)
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -115,7 +119,14 @@ func (s *Server) opdsLibrary(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	f := opds.Feed{ID: fmt.Sprintf("urn:armarium:library:%d", id), Title: lib.Name, Updated: now, Links: commonLinks(base, self, opds.NavType)}
 	f.Links = append(f.Links, opds.Link{Rel: "up", Href: base + "/catalog", Type: opds.NavType})
-	paging(&f, self, off, total, opds.NavType)
+	paging(&f, self, off, total+1, opds.NavType)
+	if off == 0 {
+		f.Entries = append(f.Entries, opds.Entry{
+			ID: fmt.Sprintf("urn:armarium:library:%d:titles", id), Title: "All titles", Updated: now,
+			Content: "Every item in this library by title",
+			Links:   []opds.Link{{Rel: opds.RelSub, Href: self + "/titles", Type: opds.AcqType}},
+		})
+	}
 	for _, se := range list {
 		f.Entries = append(f.Entries, opds.Entry{
 			ID: fmt.Sprintf("urn:armarium:series:%d", se.ID), Title: se.Name, Updated: now,
@@ -124,6 +135,25 @@ func (s *Server) opdsLibrary(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	writeFeed(w, f, opds.NavType)
+}
+
+// opdsTitles lists one library's items by title: Calibre libraries file books
+// without a series under their first author, so this is the only title index.
+func (s *Server) opdsTitles(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(r, "id")
+	if !ok {
+		s.fail(w, r, errNotFound)
+		return
+	}
+	lib, err := s.Store.Library(r.Context(), id)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	base := opdsBase(r)
+	up := fmt.Sprintf("%s/libraries/%d", base, id)
+	s.acquisition(w, r, fmt.Sprintf("urn:armarium:library:%d:titles", id), lib.Name+": All titles", up+"/titles",
+		store.ItemFilter{LibraryID: id, Sort: "title"}, opds.Link{Rel: "up", Href: up, Type: opds.NavType})
 }
 
 func (s *Server) opdsSeries(w http.ResponseWriter, r *http.Request) {
