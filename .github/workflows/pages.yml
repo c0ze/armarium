@@ -6,6 +6,8 @@ on:
     paths:
       - 'site/**'
       - '.github/workflows/pages.yml'
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -30,6 +32,33 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Configure Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
+      - name: Point the download links at the latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
+          gh release view "$version" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' > assets.txt
+          python3 - "$version" site/index.html assets.txt <<'PY'
+          import re, sys
+          tag, path, listing = sys.argv[1], sys.argv[2], sys.argv[3]
+          assets = set(open(listing, encoding="utf-8").read().split())
+          base = f"https://github.com/c0ze/armarium/releases/download/{tag}/"
+          s = open(path, encoding="utf-8").read()
+          missing = []
+          def link(m):
+              name = m.group(1).format(v=tag.lstrip("v"))
+              if name not in assets:
+                  missing.append(name)
+              return f'href="{base}{name}"'
+          s, links = re.subn(r'href="[^"]*" data-asset="([^"]+)"', link, s)
+          if missing:
+              sys.exit(f"{tag} has no {', '.join(missing)}: not publishing broken download links")
+          s, labels = re.subn(r'(<span data-release-version>)[^<]*', rf'\g<1>{tag}', s)
+          if links < 5 or labels < 1:
+              sys.exit(f"expected 5 download links and a version label, found {links} and {labels}")
+          open(path, "w", encoding="utf-8").write(s)
+          print(f"download links point at {tag}")
+          PY
       - name: Upload the static site
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
