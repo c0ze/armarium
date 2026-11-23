@@ -89,7 +89,7 @@ bin/armarium serve        # http://127.0.0.1:8580
 
 - **OPDS readers** (KOReader, Panels, Chunky, …): `/opds/v1.2/catalog` with Basic
   auth, or a token in the path for apps without it.
-- **Skrivist Comics and Skrivist Books** (iPhone, iPad, Android, Mac and
+- **Skrivist Comics and Skrivist Books** (iPhone, iPad, Mac, Android and
   Windows): offline-first readers with progress sync; pair them from Admin.
 - **PanelFlow Armarium mode:** guided panel-by-panel reading in the browser with
   progress sync.
