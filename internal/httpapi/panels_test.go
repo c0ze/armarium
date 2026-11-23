@@ -25,7 +25,7 @@ func TestPanelsSharedAcrossTokensAndRevisionConflict(t *testing.T) {
 	put := func(input store.PanelCorrection) *store.PanelCorrection {
 		input.UpdatedAt = 0
 		body, _ := json.Marshal(input)
-		w := e.do(req{method: "PUT", path: path, body: string(body), token: e.token, origin: "https://comics.skriv.ist"})
+		w := e.do(req{method: "PUT", path: path, body: string(body), token: e.token, origin: "https://reader.example"})
 		if w.Code != 200 {
 			t.Fatalf("save: %d %s", w.Code, w.Body)
 		}

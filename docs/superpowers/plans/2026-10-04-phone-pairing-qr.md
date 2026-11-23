@@ -1,5 +1,10 @@
 # Phone Pairing by QR Code Implementation Plan
 
+> **Superseded (2026-11-23).** The web readers at books.skriv.ist and
+> comics.skriv.ist closed; those addresses are the Skrivist apps' sales pages.
+> Pairing now uses the apps' own `skrivist-<app>://pair#opds=…` links; see
+> [clients.md](../../clients.md#pairing-a-phone). This record is kept as written.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Armarium's Admin page shows a QR code that opens comics.skriv.ist or books.skriv.ist on a phone with the Armarium OPDS catalogue filled in.

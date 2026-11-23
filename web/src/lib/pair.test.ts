@@ -1,35 +1,75 @@
 import { describe, expect, it, vi } from 'vitest';
 import qrcode from 'qrcode-generator';
 import { ApiError, type Token } from './api';
-import { canPair, createPairToken, deviceSlug, isLoopback, pairLink, pairTokenName, qrPath, readDeviceChoice } from './pair';
+import { canPair, createPairToken, deviceSlug, isLoopback, isPrivateHost, pairLink, pairTokenName, qrPath, readDeviceChoice } from './pair';
 
 const secret = 'Ab-_' + 'x'.repeat(39);
 
 describe('pairLink', () => {
   it('encodes the catalogue URL once, after a single trailing slash is trimmed', () => {
-    const link = pairLink('https://books.skriv.ist/', 'https://armarium.example/', secret);
-    expect(link.startsWith('https://books.skriv.ist/#opds=https%3A%2F%2F')).toBe(true);
+    const link = pairLink('skrivist-books://pair', 'https://armarium.example/', secret);
+    expect(link.startsWith('skrivist-books://pair#opds=https%3A%2F%2F')).toBe(true);
     expect(link).not.toContain('%253A');
     expect(new URLSearchParams(link.split('#')[1]).get('opds')).toBe(
       `https://armarium.example/opds/t/${secret}/v1.2/catalog`,
     );
   });
-});
 
-describe('desktop pairing', () => {
-  it('opens the desktop app with the catalogue in its fragment', () => {
+  it("builds the native apps' own links, which their QR scanners and deep links take", () => {
     expect(pairLink('skrivist-books://pair', 'http://192.168.1.5:8580', 's3cr3t')).toBe(
       'skrivist-books://pair#opds=' + encodeURIComponent('http://192.168.1.5:8580/opds/t/s3cr3t/v1.2/catalog'),
     );
-    expect(pairLink('https://comics.skriv.ist', 'https://a.example', 's3cr3t')).toBe(
-      'https://comics.skriv.ist/#opds=' + encodeURIComponent('https://a.example/opds/t/s3cr3t/v1.2/catalog'),
+    expect(pairLink('skrivist-comics://pair', 'https://a.example', 's3cr3t')).toBe(
+      'skrivist-comics://pair#opds=' + encodeURIComponent('https://a.example/opds/t/s3cr3t/v1.2/catalog'),
     );
   });
 
-  it('allows plain HTTP for the desktop apps only: phones open the HTTPS readers', () => {
-    expect(canPair({ desktop: true }, true)).toBe(true);
-    expect(canPair({ desktop: false }, true)).toBe(false);
-    expect(canPair({}, false)).toBe(true);
+  it('never names a skriv.ist web address', () => {
+    for (const app of ['skrivist-books://pair', 'skrivist-comics://pair']) {
+      expect(pairLink(app, 'https://armarium.example', secret)).not.toMatch(/skriv\.ist/);
+    }
+  });
+});
+
+describe('canPair', () => {
+  it('lets the desktop apps use any address', () => {
+    expect(canPair({ desktop: true }, 'http://8.8.8.8:8580')).toBe(true);
+  });
+
+  it('lets the phone apps use HTTPS, or plain HTTP to a private address', () => {
+    expect(canPair({ desktop: false }, 'https://armarium.example.com')).toBe(true);
+    expect(canPair({}, 'http://192.168.1.10:8580')).toBe(true);
+    expect(canPair({}, 'http://nas.tail1234.ts.net:8580')).toBe(true);
+    expect(canPair({}, 'http://armarium.example.com')).toBe(false);
+  });
+});
+
+describe('isPrivateHost', () => {
+  // The http cases of skrivist-native's contracts/pairing/url-policy.json:
+  // needs-confirmation is private, insecure is not.
+  const privateHosts = [
+    'http://10.0.0.1/', 'http://10.255.255.255:8580/opds', 'http://172.16.0.1/', 'http://172.31.255.254/',
+    'http://192.168.1.10:8580/opds/v1.2/catalog', 'http://100.64.0.1/', 'http://100.127.255.255/',
+    'http://169.254.10.20/', 'http://127.0.0.1:8580/', 'http://127.1.2.3/', 'http://[fd7a::1]:8580/',
+    'http://[fc00::1]/', 'http://[fd7a:115c:a1e0::1]/', 'http://[fd7a:0::1]:8580/', 'http://[fe80::1]/',
+    'http://[febf::1]/', 'http://[::1]:8580/', 'http://[::ffff:192.168.1.10]/', 'http://localhost:8580/',
+    'http://LOCALHOST/', 'http://x.local/', 'http://armarium.local:8580/opds', 'http://NAS.Local/',
+    'http://foo.ts.net/', 'http://nas.tail1234.ts.net:8580/', 'http://foo.ts.net./x', 'http://bücher.local/',
+    'http://xn--bcher-kva.local/',
+  ];
+  const publicHosts = [
+    'http://8.8.8.8/', 'http://example.com/', 'http://notts.net/', 'http://ts.net/', 'http://evil.ts.net.example.com/',
+    'http://local/', 'http://xlocal/', 'http://localhost.example.com/', 'http://100.128.0.1/', 'http://100.63.255.255/',
+    'http://172.32.0.1/', 'http://172.15.0.1/', 'http://192.169.0.1/', 'http://169.255.0.1/', 'http://11.0.0.1/',
+    'http://[2001:db8::1]/', 'http://[fec0::1]/', 'http://[::2]/', 'http://[::ffff:8.8.8.8]/',
+    'http://127.0.0.1.example.com/', 'http://bücher.example/',
+  ];
+
+  it.each(privateHosts)('%s is private', (u) => expect(isPrivateHost(u)).toBe(true));
+  it.each(publicHosts)('%s is not', (u) => expect(isPrivateHost(u)).toBe(false));
+
+  it('is false for text that is not a URL', () => {
+    expect(isPrivateHost('not a url')).toBe(false);
   });
 });
 
@@ -67,7 +107,7 @@ describe('deviceSlug', () => {
 
 describe('qrPath', () => {
   it('draws the generator matrix inside a 4-module quiet zone, version chosen automatically', () => {
-    const long = pairLink('https://comics.skriv.ist', 'https://' + 'a'.repeat(253), secret);
+    const long = pairLink('skrivist-comics://pair', 'https://' + 'a'.repeat(253), secret);
     const q = qrPath(long);
     const ref = qrcode(0, 'M');
     ref.addData(long, 'Byte');

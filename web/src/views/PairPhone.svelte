@@ -37,6 +37,8 @@
   // Without public_url the QR points at the address this page was loaded from.
   const base = $derived(info?.publicUrl || location.origin);
   const plainHttp = $derived(base.startsWith('http:'));
+  // The phone apps load plain http only from private addresses (LAN, Tailscale, .local).
+  const phoneBlocked = $derived(!canPair({}, base));
   const phones = $derived(info?.readers.filter((r) => !r.desktop) ?? []);
   const computers = $derived(info?.readers.filter((r) => r.desktop) ?? []);
   let copied = $state(false);
@@ -87,13 +89,16 @@
 <section>
   <div class="bar"><h2>Pair a phone</h2></div>
   <p class="note muted">
-    Opens Skrivist Comics or Skrivist Books on your phone with this library's OPDS catalogue filled in. Each pairing gets its own token.
+    Connects the Skrivist Books or Skrivist Comics app on an iPhone, iPad or Android device to this library: scan the code in the app and the catalogue is filled in. Each pairing gets its own token.
   </p>
   {#if error}<p class="error">{error}</p>{/if}
   {#if info}
-    {#if plainHttp}
-      <p class="warn block">Phones need HTTPS: the hosted readers only load HTTPS catalogues. Set <code>public_url</code> to an HTTPS address. The desktop apps below can use this address.</p>
+    {#if phoneBlocked}
+      <p class="warn block">Phones need HTTPS for <code>{base}</code>: the Skrivist apps use plain HTTP only on your local network or Tailscale. Set <code>public_url</code> to an HTTPS address, or to a local one. The desktop apps below can use this address.</p>
     {:else}
+      {#if plainHttp}
+        <p class="note muted">This address uses plain HTTP; the app asks once before it connects, and the phone must be on the same network.</p>
+      {/if}
       {#if !info.publicUrl}
         <p class="warn">public_url is not set, so the QR uses this page's address (<code>{base}</code>). A phone may not reach it.</p>
       {/if}
@@ -104,24 +109,19 @@
     <div class="device">
       <label>
         <span class="caps">Device</span>
-        <select bind:value={device} disabled={plainHttp || busy}>
+        <select bind:value={device} disabled={phoneBlocked || busy}>
           {#each DEVICES as d (d)}<option value={d}>{d}</option>{/each}
         </select>
       </label>
       {#if device === 'Other'}
-        <input bind:value={other} maxlength="40" placeholder="Name it, e.g. Pixel 8" aria-label="Device name" disabled={plainHttp || busy} />
+        <input bind:value={other} maxlength="40" placeholder="Name it, e.g. Pixel 8" aria-label="Device name" disabled={phoneBlocked || busy} />
       {/if}
     </div>
     <div class="readers">
       {#each phones as r (r.id)}
-        <button disabled={!canPair(r, plainHttp) || busy} onclick={() => pair(r)}>{r.name}</button>
+        <button disabled={!canPair(r, base) || busy} onclick={() => pair(r)}>{r.name}</button>
       {/each}
     </div>
-    {#if !plainHttp}
-      {#each phones.filter((r) => !r.corsAllowed) as r (r.id)}
-        <p class="warn">Add <code>{r.missing.join(', ')}</code> to <code>cors_origins</code>, or {r.name} can't load the catalogue.</p>
-      {/each}
-    {/if}
     {#if computers.length}
       <h3 class="caps">This computer</h3>
       <p class="note muted">Opens the Skrivist app on this Mac or Windows PC with the catalogue filled in. The apps can use HTTP on your network.</p>
@@ -158,7 +158,7 @@
           <p><a href={pairing.link}>Open in {pairing.reader.name}</a>, then press Connect in the app. Or paste the link into its catalogue field.</p>
           <button onclick={() => copy(pairing!.link)}>{copied ? 'Copied' : 'Copy link'}</button>
         {:else}
-          <p>Open the camera on {pairing.device}, scan this, then tap Connect in {pairing.reader.name}.</p>
+          <p>In {pairing.reader.name} on {pairing.device}, tap Add library, then Scan QR code, and scan this.</p>
         {/if}
         <p class="muted small">Token <strong>{pairing.name}</strong>. Revoke it under API tokens to unpair.</p>
         <code>{pairing.link}</code>

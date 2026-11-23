@@ -27,10 +27,11 @@ func TestPairPayload(t *testing.T) {
 	want := map[string]any{
 		"publicUrl": "",
 		"readers": []any{
-			map[string]any{"id": "comics", "name": "Skrivist Comics", "url": "https://comics.skriv.ist",
-				"origin": "https://comics.skriv.ist", "corsAllowed": true, "desktop": false, "missing": []any{}},
-			map[string]any{"id": "books", "name": "Skrivist Books", "url": "https://books.skriv.ist",
-				"origin": "https://books.skriv.ist", "corsAllowed": false, "desktop": false, "missing": []any{"https://books.skriv.ist"}},
+			// Phones: the native apps' own link, and no CORS (they send no Origin).
+			map[string]any{"id": "comics", "name": "Skrivist Comics", "url": "skrivist-comics://pair",
+				"origin": "", "corsAllowed": true, "desktop": false, "missing": []any{}},
+			map[string]any{"id": "books", "name": "Skrivist Books", "url": "skrivist-books://pair",
+				"origin": "", "corsAllowed": true, "desktop": false, "missing": []any{}},
 			map[string]any{"id": "comics-desktop", "name": "Skrivist Comics for Mac and Windows", "url": "skrivist-comics://pair",
 				"origin": "", "corsAllowed": false, "desktop": true, "missing": []any{"tauri://localhost", "http://tauri.localhost"}},
 			map[string]any{"id": "books-desktop", "name": "Skrivist Books for Mac and Windows", "url": "skrivist-books://pair",
@@ -53,14 +54,24 @@ func TestPairEchoesPublicURLAndMatchesOriginsExactly(t *testing.T) {
 	e := newEnv(t)
 	e.login()
 	e.srv.Cfg.PublicURL = "https://armarium.test"
-	e.srv.Cfg.CORSOrigins = []string{"https://books.skriv.ist/"}
+	e.srv.Cfg.CORSOrigins = []string{"tauri://localhost/", "http://tauri.localhost/"}
 	got := decode[pairInfo](t, e.do(req{path: "/api/pair", cookie: true}))
 	if got.PublicURL != "https://armarium.test" {
 		t.Errorf("publicUrl: %q", got.PublicURL)
 	}
 	for _, r := range got.Readers {
-		if r.CORSAllowed {
+		if r.Desktop && r.CORSAllowed {
 			t.Errorf("%s: a trailing-slash cors_origins entry never matches a browser Origin", r.ID)
+		}
+	}
+}
+
+func TestPairNeverPointsAtAWebReader(t *testing.T) {
+	e := newEnv(t)
+	e.login()
+	for _, r := range decode[pairInfo](t, e.do(req{path: "/api/pair", cookie: true})).Readers {
+		if r.URL != "skrivist-books://pair" && r.URL != "skrivist-comics://pair" {
+			t.Errorf("%s pairs through %q, not a Skrivist app link", r.ID, r.URL)
 		}
 	}
 }

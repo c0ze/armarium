@@ -20,8 +20,8 @@ curl -L -o armarium.toml https://raw.githubusercontent.com/c0ze/armarium/main/de
    and set `user:` to the owner of `./data` (`id -u` / `id -g`).
 2. Edit `armarium.toml`: one `[[library]]` per folder (paths as seen inside the
    container), `listen = "0.0.0.0:8580"`, and every host name you will use in
-   `allowed_hosts`. To read on a phone, also set `public_url` (your HTTPS address)
-   and `cors_origins` (see [Phones](#phones) below).
+   `allowed_hosts`. To read on a phone, also set `public_url` (see [Phones](#phones)
+   below).
 3. Set the owner password:
    ```bash
    docker run --rm -i ghcr.io/c0ze/armarium hash-password
@@ -59,31 +59,32 @@ To update, pull the new image in Container Manager and rebuild the project.
 
 ## Phones
 
-Skrivist Comics and Skrivist Books are web apps served over HTTPS, so they can only
-load an HTTPS Armarium, and only from origins Armarium allows:
+Skrivist Comics and Skrivist Books for iPhone, iPad and Android load the catalogue
+from `public_url`: HTTPS, or plain HTTP to an address on your network or Tailscale
+(the apps ask once before using plain HTTP).
 
 ```toml
 allowed_hosts = ["books.example.com"]
 public_url    = "https://books.example.com"
-cors_origins  = [
-  "https://comics.skriv.ist", "https://books.skriv.ist",
-  "tauri://localhost", "http://tauri.localhost", "https://tauri.localhost",
-]
 ```
 
-Restart, then **Admin → Pair a phone**: pick a reader and scan the QR code with the
-phone's camera. Admin warns when `public_url` is missing, points at this computer,
-or a reader's origin is missing from `cors_origins`, and refuses to pair over plain
-HTTP. More in [clients.md](clients.md#pairing-a-phone).
+Restart, then **Admin → Pair a phone**: pick an app and scan the QR code in it
+(**Add library → Scan QR code**). Admin warns when `public_url` is missing or
+points at this computer, and refuses to pair a phone to a public plain-HTTP
+address. More in [clients.md](clients.md#pairing-a-phone).
 
 The Mac and Windows apps pair from **Admin → This computer** instead, and can use
-plain HTTP on your network ([clients.md](clients.md#pairing-this-computer)).
+plain HTTP on your network ([clients.md](clients.md#pairing-this-computer)). They
+need their origins in `cors_origins`, as in the example configuration:
 
-This list also supports Skrivist Books and Comics on macOS and Windows and is
-included in the example configuration from v0.3.2. Existing installations must
-add the desktop origins to their own `cors_origins` and restart after upgrading;
-the update does not replace your configuration. Keep any other reader origins
-you already use.
+```toml
+cors_origins = ["tauri://localhost", "http://tauri.localhost", "https://tauri.localhost"]
+```
+
+Existing installations older than v0.3.2 must add these to their own
+`cors_origins` and restart after upgrading; the update does not replace your
+configuration. The entries `https://comics.skriv.ist` and `https://books.skriv.ist`
+that older examples had are no longer needed and can be removed.
 
 ## Forgot the owner password?
 
@@ -179,8 +180,8 @@ Back up the data folder (`armarium.db`) first, as for any upgrade. Then:
   are never moved.
   Current Skrivist Books and Comics know about this (`pageOrder` on items); an old
   Comics that still remembers a page by its old number would write that number
-  back the first time it opens such a comic. The hosted readers update on their
-  own; update the Mac and Windows apps before upgrading Armarium.
+  back the first time it opens such a comic. Update the Skrivist apps on
+  every device before upgrading Armarium.
 - **Item and series ids are now never reused** (a one-time table rebuild at the
   first start; it keeps every id).
 - **A library missing from the config no longer deletes anything.** Armarium

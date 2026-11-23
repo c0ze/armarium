@@ -6,7 +6,7 @@ token under **Admin** for each app.
 ## OPDS apps
 
 Any OPDS 1.2 client should work (KOReader, Panels, Chunky, …). End-to-end tests so
-far cover PanelFlow and comics.skriv.ist; the feeds themselves are checked by the
+far cover PanelFlow and the Skrivist apps; the feeds themselves are checked by the
 test suite (valid Atom, link order, PSE attributes, token prefixes).
 
 - Catalog URL: `https://<host>/opds/v1.2/catalog`, with HTTP Basic auth (any user
@@ -25,27 +25,30 @@ test suite (valid Atom, link order, PSE attributes, token prefixes).
 
 ## Pairing a phone
 
-Admin → **Pair a phone** shows a QR code that opens Skrivist Comics
-(comics.skriv.ist) or Skrivist Books (books.skriv.ist) on a phone with this
-library's OPDS catalogue filled in; tap Connect and it's done. Pick the device
-(iPhone, Android, iPad or your own name) first: each pairing creates its own token,
-named like `books-iphone-2026-10-04-1532`, so you can tell devices apart and revoke
-one without the others.
+Admin → **Pair a phone** shows a QR code for the Skrivist Comics or Skrivist
+Books app on an iPhone, iPad or Android device. In the app, tap **Add library →
+Scan QR code** and scan it: the app adds this library's OPDS catalogue with its own
+token. Pick the device (iPhone, Android, iPad or your own name) first: each pairing
+creates its own token, named like `books-iphone-2026-10-04-1532`, so you can tell
+devices apart and revoke one without the others.
 
-- Set `public_url` to the HTTPS address phones use, e.g.
-  `https://armarium.example.com`. Its host must be in `allowed_hosts`. The hosted
-  readers refuse plain-HTTP catalogues, so Admin won't pair over HTTP.
-- Add the reader origins to `cors_origins` (`https://comics.skriv.ist`,
-  `https://books.skriv.ist`): the readers fetch the catalogue from the browser.
-  Entries are matched as a browser sends them; Armarium normalises case, default
-  ports and a trailing slash, and refuses entries with a path.
+- The QR holds a `skrivist-comics://pair#opds=…` or `skrivist-books://pair#opds=…`
+  link. Either app takes either link. Skrivist Comics also opens from the phone's
+  camera, because the app registers its link with the phone.
+- Set `public_url` to the address phones use, e.g. `https://armarium.example.com`.
+  Its host must be in `allowed_hosts`. Without it Admin uses the address of the
+  page you have open.
+- Plain HTTP works on your network: the apps accept it for private addresses
+  (`192.168.x.x`, `10.x.x.x`, Tailscale's `100.64.0.0/10` and `*.ts.net`,
+  `*.local`) and ask once before connecting. Anything else needs HTTPS, and Admin
+  won't pair a phone to a public plain-HTTP address.
+- The phone apps need no `cors_origins` entry: they are not web pages.
 - The phone itself must reach `public_url`. If Armarium is only on your home network
   or a VPN such as Tailscale, the phone has to be on it too, and its DNS has to give
-  an address the phone can reach. A QR that opens the reader but then spins on
-  Connect almost always means the phone can't reach the server.
-- The QR carries the token in the link's fragment, which never reaches the reader's
-  server. After Connect the readers send it as an `Authorization: Bearer` header to
-  the plain `/opds/v1.2/…` URLs and keep it apart from every URL they store, so it
+  an address the phone can reach. A pairing that spins on Connect almost always
+  means the phone can't reach the server.
+- After Connect the apps send the token as an `Authorization: Bearer` header to the
+  plain `/opds/v1.2/…` URLs and keep it apart from every URL they store, so it
   does not end up in a proxy's access log. (Generic token-in-path OPDS apps still
   put it in the path.)
 - To unpair, revoke the token under API tokens, then forget the shelf on the phone.
@@ -60,27 +63,25 @@ on this computer (or paste it into the app's catalogue field), then press Connec
 in the app. The desktop apps can use plain HTTP on your network, so this works
 without `public_url` or HTTPS.
 
-## PanelFlow and comics.skriv.ist
+## PanelFlow
 
-These guided-view comic readers have an Armarium mode at `/armarium`: connect with
+This guided-view comic reader has an Armarium mode at `/armarium`: connect with
 the Armarium URL and a token, browse comics libraries, and read with pages streamed
 from Armarium and progress saved back to it.
 
-- Add the reader's origin to `cors_origins` (for example `https://comics.skriv.ist`).
+- Add the origin PanelFlow is served from to `cors_origins` (for example
+  `https://comics.example.com`).
   The browser calls Armarium directly; no proxy and no cookies are involved.
 - An HTTPS reader needs an HTTPS Armarium.
 - Set `panelflow_url` and Armarium's item pages link comics straight into the reader.
 
 ## Skrivist Books and Comics desktop apps
 
-The macOS and Windows ports use the same direct requests as the hosted readers;
-the desktop webview has a different origin. Allow the origins explicitly in your
-Armarium config and restart the server:
+The macOS and Windows apps call Armarium from a webview, so Armarium has to allow
+their origins. Allow them explicitly in your Armarium config and restart the server:
 
 ```toml
 cors_origins = [
-  "https://comics.skriv.ist",
-  "https://books.skriv.ist",
   "tauri://localhost",         # macOS
   "http://tauri.localhost",    # Windows default
   "https://tauri.localhost",   # Windows builds using useHttpsScheme
@@ -162,12 +163,6 @@ KOReader sync protocol (KOSync). Create one API token for the device under
   any device that asks, like any KOSync server.
 - KOReader itself is not supported yet: it authenticates with an MD5 of the
   password only, which Armarium can't check against its stored token digests.
-
-## skriv.ist (Skrivist)
-
-Skrivist's OPDS browser works with Armarium's feeds for EPUBs. Its server-side
-proxy refuses private and Tailscale addresses, so Armarium must be reachable on a
-public HTTPS host name.
 
 ## JSON API
 

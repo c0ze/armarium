@@ -79,7 +79,7 @@ func canonicalOrigin(raw string) (string, error) {
 	if strings.EqualFold(s, "tauri://localhost") {
 		return "tauri://localhost", nil
 	}
-	bad := fmt.Errorf("cors_origins entry %q must be an origin such as https://books.skriv.ist (scheme and host, no path), or tauri://localhost", raw)
+	bad := fmt.Errorf("cors_origins entry %q must be an origin such as https://reader.example.com (scheme and host, no path), or tauri://localhost", raw)
 	u, err := url.Parse(s)
 	if err != nil || u.User != nil || u.Opaque != "" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" ||
 		(u.Path != "" && u.Path != "/") || u.Host == "" {

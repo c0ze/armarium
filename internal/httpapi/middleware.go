@@ -70,7 +70,7 @@ func (s *Server) hosts(next http.Handler) http.Handler {
 	})
 }
 
-// cors lets the configured reader origins (e.g. PanelFlow, comics.skriv.ist) call the
+// cors lets the configured reader origins (e.g. PanelFlow, the Skrivist desktop apps) call the
 // API and OPDS with tokens. No credentials: those clients never send cookies.
 func (s *Server) cors(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

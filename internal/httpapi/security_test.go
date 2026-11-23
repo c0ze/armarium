@@ -94,7 +94,7 @@ func TestCSRF(t *testing.T) {
 		{"cookie, form post", req{method: "PUT", path: path, body: body, cookie: true, origin: "https://armarium.test", ctype: "text/plain"}, 415},
 		{"cookie, own origin", req{method: "PUT", path: path, body: body, cookie: true, origin: "https://armarium.test"}, 200},
 		{"basic, foreign origin", req{method: "PUT", path: path, body: body, basic: e.token, origin: "https://evil.example"}, 403},
-		{"bearer, cors origin", req{method: "PUT", path: path, body: body, token: e.token, origin: "https://comics.skriv.ist"}, 200},
+		{"bearer, cors origin", req{method: "PUT", path: path, body: body, token: e.token, origin: "https://reader.example"}, 200},
 		{"bearer, no origin (server client)", req{method: "PUT", path: path, body: body, token: e.token}, 200},
 		{"bearer, foreign origin", req{method: "PUT", path: path, body: body, token: e.token, origin: "https://evil.example"}, 403},
 		{"logout cross-site", req{method: "POST", path: "/api/logout", body: `{}`, cookie: true, origin: "https://evil.example"}, 403},
@@ -112,16 +112,16 @@ func TestCORSPreflightAndHeaders(t *testing.T) {
 		return e.do(req{method: "OPTIONS", path: "/api/items/1/progress", origin: origin, headers: map[string]string{
 			"Access-Control-Request-Method": "PUT", "Access-Control-Request-Headers": "authorization, content-type"}})
 	}
-	w := preflight("https://comics.skriv.ist")
-	if w.Code != http.StatusNoContent || w.Header().Get("Access-Control-Allow-Origin") != "https://comics.skriv.ist" ||
+	w := preflight("https://reader.example")
+	if w.Code != http.StatusNoContent || w.Header().Get("Access-Control-Allow-Origin") != "https://reader.example" ||
 		!strings.Contains(w.Header().Get("Access-Control-Allow-Headers"), "Authorization") {
 		t.Fatalf("preflight: %d %v", w.Code, w.Header())
 	}
 	if w := preflight("https://evil.example"); w.Header().Get("Access-Control-Allow-Origin") != "" {
 		t.Fatal("foreign origin got CORS headers")
 	}
-	got := e.do(req{path: "/api/libraries", token: e.token, origin: "https://comics.skriv.ist"})
-	if got.Header().Get("Access-Control-Allow-Origin") != "https://comics.skriv.ist" || got.Header().Get("Access-Control-Allow-Credentials") != "" {
+	got := e.do(req{path: "/api/libraries", token: e.token, origin: "https://reader.example"})
+	if got.Header().Get("Access-Control-Allow-Origin") != "https://reader.example" || got.Header().Get("Access-Control-Allow-Credentials") != "" {
 		t.Fatalf("simple request CORS headers: %v", got.Header())
 	}
 }
@@ -306,7 +306,7 @@ func TestAdminRevokesTokens(t *testing.T) {
 
 func TestCORSAnswersBeforeTheHostCheck(t *testing.T) {
 	e := newEnv(t)
-	o := "https://comics.skriv.ist"
+	o := "https://reader.example"
 	pre := map[string]string{"Access-Control-Request-Method": "GET", "Access-Control-Request-Headers": "authorization", "Access-Control-Request-Private-Network": "true"}
 	w := e.do(req{method: "OPTIONS", path: "/opds/v1.2/catalog", host: "nas.example", origin: o, headers: pre})
 	if w.Code != http.StatusNoContent || w.Header().Get("Access-Control-Allow-Origin") != o || w.Header().Get("Access-Control-Allow-Private-Network") != "true" {
@@ -320,7 +320,7 @@ func TestCORSAnswersBeforeTheHostCheck(t *testing.T) {
 
 func TestOPDSAliasAndVary(t *testing.T) {
 	e := newEnv(t)
-	o := "https://comics.skriv.ist"
+	o := "https://reader.example"
 	if w := e.do(req{path: "/opds", origin: o, token: e.token}); w.Code != 200 || w.Header().Get("Access-Control-Allow-Origin") != o {
 		t.Fatalf("/opds: %d %v", w.Code, w.Header())
 	}
@@ -335,7 +335,7 @@ func TestOPDSAliasAndVary(t *testing.T) {
 
 func TestPreflightVariesOnItsRequestHeaders(t *testing.T) {
 	e := newEnv(t)
-	w := e.do(req{method: "OPTIONS", path: "/api/libraries", origin: "https://comics.skriv.ist", headers: map[string]string{
+	w := e.do(req{method: "OPTIONS", path: "/api/libraries", origin: "https://reader.example", headers: map[string]string{
 		"Access-Control-Request-Method": "GET", "Access-Control-Request-Headers": "authorization"}})
 	vary := strings.Join(w.Header().Values("Vary"), ",")
 	for _, h := range []string{"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", "Access-Control-Request-Private-Network"} {

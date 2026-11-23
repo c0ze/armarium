@@ -138,7 +138,7 @@ func TestOPDSFeedsKeepTheTokenPrefixAndNeverRedirect(t *testing.T) {
 	}
 	for _, p := range []string{"/opds", "/opds/v1.2", "/opds/v1.2/catalog", "/opds/v1.2/recent", "/opds/v1.2/search?q=saga", "/opds/v1.2/opensearch.xml"} {
 		if w := e.do(req{path: p, basic: e.token}); w.Code != 200 {
-			t.Errorf("%s: %d (redirects are refused by comics.skriv.ist)", p, w.Code)
+			t.Errorf("%s: %d (strict clients refuse redirects)", p, w.Code)
 		}
 	}
 	search := e.do(req{path: base + "/search?q=saga"}).Body.String()

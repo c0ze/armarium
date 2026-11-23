@@ -1,5 +1,10 @@
 # Phone pairing by QR code
 
+> **Superseded (2026-11-23).** The web readers at books.skriv.ist and
+> comics.skriv.ist closed; those addresses are the Skrivist apps' sales pages.
+> Pairing now uses the apps' own `skrivist-<app>://pair#opds=…` links; see
+> [clients.md](../../clients.md#pairing-a-phone). This record is kept as written.
+
 Date: 2026-10-04. Status: approved design, revised after Codex and Grok reviews.
 
 ## Goal

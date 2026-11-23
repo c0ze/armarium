@@ -40,7 +40,7 @@ func TestLoadRejectsBadConfig(t *testing.T) {
 	cases := map[string]string{
 		"bad kind":    "[[library]]\nname='a'\nroot='/x'\nkind='movies'\n",
 		"dup name":    "[[library]]\nname='a'\nroot='/x'\nkind='books'\n[[library]]\nname='a'\nroot='/y'\nkind='books'\n",
-		"bad origin":  "cors_origins=['comics.skriv.ist']\n",
+		"bad origin":  "cors_origins=['reader.example']\n",
 		"empty hosts": "allowed_hosts=[]\n",
 	}
 	for name, body := range cases {
@@ -77,15 +77,13 @@ func TestDesktopCORSOrigins(t *testing.T) {
 	}
 }
 
-func TestShippedExampleAllowsSkrivistWebAndDesktop(t *testing.T) {
+func TestShippedExampleAllowsOnlyTheSkrivistDesktopApps(t *testing.T) {
 	c, err := Load(filepath.Join("..", "..", "deploy", "armarium.example.toml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{
-		"https://comics.skriv.ist", "https://books.skriv.ist",
-		"tauri://localhost", "http://tauri.localhost", "https://tauri.localhost",
-	}
+	// The phone apps send no Origin; the web readers at *.skriv.ist are closed.
+	want := []string{"tauri://localhost", "http://tauri.localhost", "https://tauri.localhost"}
 	if !slices.Equal(c.CORSOrigins, want) {
 		t.Fatalf("shipped example origins: got %v, want %v", c.CORSOrigins, want)
 	}
@@ -206,16 +204,16 @@ func TestTrustedProxiesRefuseEntriesThatTrustNothingOrEveryone(t *testing.T) {
 
 func TestCORSOriginsAreCanonical(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "armarium.toml")
-	os.WriteFile(p, []byte(`cors_origins = ["HTTPS://Books.Skriv.Ist/", "https://comics.skriv.ist:443", "TAURI://localhost", "http://[::1]:8080"]`), 0o600)
+	os.WriteFile(p, []byte(`cors_origins = ["HTTPS://Books.Reader.Example/", "https://comics.reader.example:443", "TAURI://localhost", "http://[::1]:8080"]`), 0o600)
 	c, err := Load(p)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"https://books.skriv.ist", "https://comics.skriv.ist", "tauri://localhost", "http://[::1]:8080"}
+	want := []string{"https://books.reader.example", "https://comics.reader.example", "tauri://localhost", "http://[::1]:8080"}
 	if !slices.Equal(c.CORSOrigins, want) {
 		t.Fatalf("got %v, want %v", c.CORSOrigins, want)
 	}
-	for _, bad := range []string{"https://books.skriv.ist/app", "https://x.example?y", "https://u@x.example", "https://x.example#f"} {
+	for _, bad := range []string{"https://books.reader.example/app", "https://x.example?y", "https://u@x.example", "https://x.example#f"} {
 		os.WriteFile(p, []byte(`cors_origins = ["`+bad+`"]`), 0o600)
 		if _, err := Load(p); err == nil {
 			t.Errorf("%q must be rejected: a browser Origin never has a path, query, fragment or user", bad)
