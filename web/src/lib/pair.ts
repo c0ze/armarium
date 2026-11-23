@@ -1,22 +1,68 @@
-// Pairing a phone or the desktop apps: the link (and for phones the QR code that
-// carries it). The link is <reader>/#opds=<catalogue>, which comics.skriv.ist and
-// books.skriv.ist read on startup, or skrivist-<app>://pair#opds=<catalogue> for the
-// desktop apps; the token rides in the fragment, so it never reaches a reader's host.
+// Pairing the Skrivist apps: the link (and for phones the QR code that carries it).
+// Every app takes skrivist-<app>://pair#opds=<catalogue>: the iPhone, iPad and Android
+// apps scan it in Add library → Scan QR code, and the Mac and Windows apps open it as
+// a link. Either app takes either app's link. The token rides in the fragment.
 import qrcode from 'qrcode-generator';
 import { ApiError, type Token } from './api';
 
 const trimSlash = (s: string) => s.replace(/\/$/, '');
 
-export function pairLink(readerUrl: string, base: string, secret: string): string {
+/** appLink is the app's own pairing link, e.g. skrivist-books://pair. */
+export function pairLink(appLink: string, base: string, secret: string): string {
   const catalogue = `${trimSlash(base)}/opds/t/${secret}/v1.2/catalog`;
-  // The desktop apps' own link (skrivist-books://pair) takes the fragment directly.
-  const reader = readerUrl.includes('://pair') ? readerUrl : `${trimSlash(readerUrl)}/`;
-  return `${reader}#opds=${encodeURIComponent(catalogue)}`;
+  return `${appLink}#opds=${encodeURIComponent(catalogue)}`;
 }
 
-/** Phones open the hosted readers, which only load HTTPS catalogues; the desktop
- * apps can use plain HTTP on the local network. */
-export const canPair = (reader: { desktop?: boolean }, plainHttp: boolean) => !!reader.desktop || !plainHttp;
+/** The Skrivist apps' rule for plain http (contracts/pairing/url-policy.json in
+ * skrivist-native): only private addresses and names, and only after the user confirms.
+ * IPv4 10/8, 172.16/12, 192.168/16, 100.64/10 (Tailscale), 169.254/16, 127/8; IPv6
+ * fc00::/7, fe80::/10, ::1 and IPv4-mapped private addresses; localhost, *.local, *.ts.net. */
+export function isPrivateHost(base: string): boolean {
+  let host: string;
+  try {
+    host = new URL(base).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  if (host.endsWith('.')) host = host.slice(0, -1);
+  if (host.startsWith('[')) {
+    const b = ipv6(host.slice(1, -1));
+    if (!b) return false;
+    if (b.slice(0, 10).every((x) => x === 0) && b[10] === 0xff && b[11] === 0xff) return privateV4(b.slice(12));
+    const loopback = b.slice(0, 15).every((x) => x === 0) && b[15] === 1;
+    return loopback || (b[0] & 0xfe) === 0xfc || (b[0] === 0xfe && (b[1] & 0xc0) === 0x80);
+  }
+  const v4 = host.split('.');
+  if (v4.length === 4 && v4.every((p) => /^(0|[1-9]\d{0,2})$/.test(p) && +p <= 255)) return privateV4(v4.map(Number));
+  return (
+    host === 'localhost' ||
+    (host.endsWith('.local') && host.length > '.local'.length) ||
+    (host.endsWith('.ts.net') && host.length > '.ts.net'.length)
+  );
+}
+
+function privateV4([a, b]: number[]): boolean {
+  return a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) ||
+    (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254);
+}
+
+/** The 16 bytes of an IPv6 address as the URL parser writes it (hex groups, `::`). */
+function ipv6(text: string): number[] | null {
+  const halves = text.split('::');
+  if (halves.length > 2) return null;
+  const groups = (s: string) => (s ? s.split(':').map((g) => (/^[0-9a-f]{1,4}$/.test(g) ? parseInt(g, 16) : NaN)) : []);
+  const head = groups(halves[0]);
+  const tail = halves.length === 2 ? groups(halves[1]) : [];
+  if (halves.length === 2 && head.length + tail.length > 7) return null;
+  const all = halves.length === 2 ? [...head, ...Array(8 - head.length - tail.length).fill(0), ...tail] : head;
+  if (all.length !== 8 || all.some(Number.isNaN)) return null;
+  return all.flatMap((g) => [g >> 8, g & 0xff]);
+}
+
+/** Whether this reader can load the catalogue from base. The desktop apps take any
+ * address; the phone apps take HTTPS, or plain http to a private address. */
+export const canPair = (reader: { desktop?: boolean }, base: string) =>
+  !!reader.desktop || base.startsWith('https:') || isPrivateHost(base);
 
 const pad = (n: number) => String(n).padStart(2, '0');
 

@@ -20,9 +20,9 @@ basic setup, and reading with Skrivist Books and Comics.
   by the web UI, OPDS page streaming and connected readers.
 - **Web UI:** library grid with search and filters, an EPUB reader, a quick comic
   viewer, and an admin page for scanning and API tokens. Works on phones.
-- **Phone pairing:** Admin shows a QR code; scan it with the phone's camera and
-  [Skrivist Comics](https://comics.skriv.ist) or [Skrivist Books](https://books.skriv.ist)
-  opens with your library filled in; tap Connect. No addresses or tokens to type.
+- **Phone pairing:** Admin shows a QR code; scan it in the Skrivist Books or
+  Skrivist Comics app for iPhone, iPad or Android (Add library → Scan QR code) and
+  your library is added. No addresses or tokens to type.
 - **Light on hardware:** one static binary with pure-Go SQLite, about 30–50 MB of
   memory while scanning ten thousand books, incremental scans that only open new or
   changed files, and no background indexing unless you ask for it.
@@ -46,19 +46,16 @@ systemd. Every setting is explained in
 
 ### Read on your phone
 
-1. Put Armarium behind HTTPS (a reverse proxy such as Synology's, Caddy or
-   Tailscale Serve) and set three things in `armarium.toml`:
+1. Set the address the phone uses in `armarium.toml`. At home that can be plain
+   HTTP on your network or Tailscale; anywhere else it needs HTTPS (a reverse
+   proxy such as Synology's, Caddy or Tailscale Serve):
    ```toml
    allowed_hosts = ["armarium.example.com"]
    public_url    = "https://armarium.example.com"
-   cors_origins  = [
-     "https://comics.skriv.ist", "https://books.skriv.ist",
-     "tauri://localhost", "http://tauri.localhost", "https://tauri.localhost",
-   ]
    ```
 2. Restart, log in, open **Admin → Pair a phone** and pick Skrivist Comics or
    Skrivist Books.
-3. Point the phone's camera at the QR code, open the link, tap **Connect**.
+3. In the app on the phone, tap **Add library → Scan QR code** and scan the code.
 
 Each pairing gets its own token; revoke it under API tokens in Admin to unpair.
 Details in [docs/clients.md](docs/clients.md#pairing-a-phone).
@@ -70,10 +67,14 @@ computer**: it opens the app with your library filled in, and works over plain
 HTTP on your network too. See
 [docs/clients.md](docs/clients.md#pairing-this-computer).
 
-The example configuration also allows the Skrivist macOS and Windows apps.
-When upgrading an existing installation to v0.3.2 or later, add the three desktop
-origins above to your existing `cors_origins` and restart Armarium; upgrading
-the binary or Docker image preserves your configuration.
+The Mac and Windows apps need their origins in `cors_origins`; the example
+configuration has them:
+```toml
+cors_origins = ["tauri://localhost", "http://tauri.localhost", "https://tauri.localhost"]
+```
+When upgrading an installation older than v0.3.2, add them to your existing
+`cors_origins` and restart Armarium; upgrading the binary or Docker image keeps
+your configuration.
 
 From source (Go 1.26+, Node 22+):
 
@@ -88,9 +89,9 @@ bin/armarium serve        # http://127.0.0.1:8580
 
 - **OPDS readers** (KOReader, Panels, Chunky, …): `/opds/v1.2/catalog` with Basic
   auth, or a token in the path for apps without it.
-- **Skrivist Comics and Skrivist Books** (comics.skriv.ist, books.skriv.ist, and
-  their Mac and Windows apps): offline-first readers; pair them from Admin.
-- **PanelFlow / comics.skriv.ist Armarium mode:** guided panel-by-panel reading with
+- **Skrivist Comics and Skrivist Books** (iPhone, iPad, Android, Mac and
+  Windows): offline-first readers with progress sync; pair them from Admin.
+- **PanelFlow Armarium mode:** guided panel-by-panel reading in the browser with
   progress sync.
 - **CrossPoint Reader** (Xteink X4 and other e-ink readers): OPDS downloads and
   reading positions synced over the KOReader sync protocol at `/kosync`.

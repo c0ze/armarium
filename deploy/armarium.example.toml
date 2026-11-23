@@ -14,20 +14,20 @@ data_dir = "./data"
 # Host are refused. An entry without a port matches any port.
 allowed_hosts = ["localhost", "127.0.0.1"]   # add e.g. "books.example.com", "192.168.1.10"
 
-# Skrivist Books and Comics: hosted readers and macOS/Windows desktop apps.
-# Requests still require an API token; cross-origin cookies are not allowed.
-# Full origins, no trailing slash. Remove any clients you do not use, or set []
-# to disable cross-origin access. See docs/clients.md.
+# Browser-based readers allowed to call Armarium: here the Skrivist Books and
+# Comics apps for macOS and Windows (the iPhone, iPad and Android apps need no
+# entry). Requests still require an API token; cross-origin cookies are not
+# allowed. Full origins, no trailing slash. Add PanelFlow's origin if you use it,
+# or set [] to disable cross-origin access. See docs/clients.md.
 cors_origins = [
-  "https://comics.skriv.ist",
-  "https://books.skriv.ist",
   "tauri://localhost",         # macOS
   "http://tauri.localhost",    # Windows
   "https://tauri.localhost",   # Windows with useHttpsScheme
 ]
 
-# The address phones and the hosted readers use: the "Pair a phone" QR codes in
-# Admin point here. HTTPS, no path; its host must be in allowed_hosts.
+# The address phones use: the "Pair a phone" QR codes in Admin point here. No
+# path; its host must be in allowed_hosts. HTTPS, or plain http to an address on
+# your network or Tailscale (the Skrivist apps refuse plain http anywhere else).
 # public_url = "https://armarium.example.com"
 
 # Owner password for the web UI, as an argon2id hash: `armarium hash-password`.

@@ -86,7 +86,7 @@ export interface PairReader {
   url: string;
   origin: string;
   corsAllowed: boolean;
-  /** A Skrivist desktop app (skrivist-<app>://pair) rather than a hosted reader. */
+  /** A Skrivist Mac or Windows app, opened on this computer, rather than a phone app paired by QR code. */
   desktop?: boolean;
   /** The exact cors_origins entries still to add. */
   missing: string[];

@@ -110,7 +110,7 @@
 
   <section>
     <div class="bar"><h2>API tokens</h2></div>
-    <p class="note muted">For PanelFlow, comics.skriv.ist and OPDS apps. A token reads and saves progress; it can never administer.</p>
+    <p class="note muted">For the Skrivist apps, PanelFlow and other OPDS apps. A token reads and saves progress; it can never administer.</p>
     <form onsubmit={createToken} class="new">
       <input placeholder="Name it after the app, e.g. panelflow" bind:value={newName} maxlength="64" aria-label="Token name" />
       <button disabled={!newName.trim()}>Create token</button>
@@ -144,7 +144,8 @@
     <div class="bar"><h2>Connecting apps</h2></div>
     <dl>
       <dt class="caps">OPDS, Basic auth</dt><dd><code>{origin}/opds/v1.2/catalog</code> · any user name, a token as the password</dd>
-      <dt class="caps">PanelFlow · comics.skriv.ist</dt><dd>Server <code>{origin}</code> and a token; the reader's origin must be in <code>cors_origins</code></dd>
+      <dt class="caps">Skrivist Books · Comics</dt><dd>Pair them above; no token or address to type</dd>
+      <dt class="caps">PanelFlow</dt><dd>Server <code>{origin}</code> and a token; the reader's origin must be in <code>cors_origins</code></dd>
     </dl>
   </section>
 {/if}

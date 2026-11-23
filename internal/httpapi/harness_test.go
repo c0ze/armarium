@@ -65,7 +65,7 @@ func newEnv(t *testing.T) *env {
 	cfg.DataDir = t.TempDir()
 	cfg.PasswordHash = passwordHash
 	cfg.AllowedHosts = []string{"armarium.test", "localhost"}
-	cfg.CORSOrigins = []string{"https://comics.skriv.ist"}
+	cfg.CORSOrigins = []string{"https://reader.example"}
 	cfg.Libraries = []config.Library{
 		{Name: "Comics", Root: comics, Kind: "comics"},
 		{Name: "Books", Root: books, Kind: "books", Include: []string{"*_downloads"}},

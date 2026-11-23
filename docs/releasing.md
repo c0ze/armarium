@@ -36,5 +36,5 @@
 Existing installations retain their configuration. For v0.3.2, release notes
 must tell users to merge `tauri://localhost`, `http://tauri.localhost` and
 `https://tauri.localhost` into `cors_origins` and restart. New installations
-using the shipped example already allow both hosted readers and desktop apps;
+using the shipped example already allow the desktop apps;
 authentication remains required and cross-origin cookies remain disabled.
